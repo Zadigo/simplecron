@@ -11,3 +11,5 @@ wheels/
 
 pytest-*.json
 .coverage*
+*coverage_*
+playground.py

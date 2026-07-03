@@ -8,6 +8,9 @@
         "-l",
         "--durations=10",
         "--durations-min=1.0",
-        "--report-log=pytest-report.json"
+        "--report-log=pytest-report.json",
+        "--cov=simplecron",
+        "--cov-report=term-missing",
+        "--cov-report=html:coverage_html"
     ]
 }
