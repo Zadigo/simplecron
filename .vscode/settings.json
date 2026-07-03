@@ -1,0 +1,13 @@
+{
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestArgs": [
+        "${workspaceFolder}",
+        "-v",
+        "-s",
+        "-l",
+        "--durations=10",
+        "--durations-min=1.0",
+        "--report-log=pytest-report.json"
+    ]
+}

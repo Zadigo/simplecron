@@ -1,0 +1,22 @@
+[project]
+name = "simplecron"
+version = "0.1.0.dev1"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "pydantic>=2.13.4",
+    "redis>=8.0.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-aio>=2.1.7",
+    "pytest-cov>=7.1.0",
+    "pytest-crayons>=0.0.9",
+    "pytest-datafiles>=3.0.1",
+    "pytest-env>=1.6.0",
+    "pytest-reportlog>=1.0.0",
+    "ruff>=0.15.20",
+]
