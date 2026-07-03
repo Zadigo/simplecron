@@ -6,6 +6,8 @@ import uuid
 import time
 from typing import Callable, Optional
 from collections import defaultdict
+
+import pytz
 from simplecron import exceptions
 from simplecron.typings import TypeJobFunction
 from simplecron import utils
@@ -30,6 +32,12 @@ class EventListener(enum.Enum):
     BEFORE_ALL = "before_all"
     BEFORE = "before"
     AFTER = "after"
+
+
+# class CycleUnit(enum.Enum):
+#     HOURLY = "hourly"
+#     MINUTELY = "minutely"
+#     SECONDLY = "secondly"
 
 
 class BaseScheduler:
@@ -96,6 +104,8 @@ class Job:
         job_uuid (uuid.UUID): A unique identifier for the job, used for tracking and management.
     """
 
+    label_template = 'every {interval} {unit} at {at_time}'
+
     def __init__(self, interval: int, scheduler: Optional[BaseScheduler] = None):
         # The interval in seconds at which the job should run.
         self.interval = interval
@@ -123,7 +133,7 @@ class Job:
         # Optional time of final run
         self.cancel_after: Optional[datetime.datetime] = None
 
-        self.tags: set[str] = set()
+        self._tags: set[str] = set()
         # Scheduler instance to which the job belongs. If not provided, the default scheduler will be used.
         self.scheduler: Optional[BaseScheduler] = scheduler
         # Unique identifier for the job, used for tracking and management
@@ -168,6 +178,17 @@ class Job:
     def minutes(self) -> "Job":
         self.unit = TimeUnit.MINUTES.value
         return self
+
+    def _get_label(self) -> str:
+        """Generate a human-readable label for the job, describing its schedule."""
+        if self.at_time is not None:
+            return self.label_template.format(
+                interval=self.interval,
+                unit=self.unit,
+                at_time=self.at_time.strftime("%H:%M:%S")
+            )
+        else:
+            return f"every {self.interval} {self.unit}"
 
     def _move_to_at_time(self, dt: datetime.datetime) -> datetime.datetime:
         """Move the given datetime to the specified 'at_time' if it is set.
@@ -293,6 +314,15 @@ class Job:
             restore_time=self.at_time is not None
         )
 
+    def tags(self, *tags: str) -> "Job":
+        """Add tags to the job for categorization and filtering."""
+        for tag in tags:
+            if not isinstance(tag, str):
+                raise ValueError(f"Tag must be a string, got {type(tag)}")
+
+        self._tags.update(tags)
+        return self
+
     def do(self, job_func: TypeJobFunction, *args, **kwargs) -> "Job":
         """Assign a function to be executed when the job runs
 
@@ -327,6 +357,50 @@ class Job:
         self.scheduler.jobs.append(self)
         return self
 
+    def at(self, using: datetime.time, timezone: Optional[datetime.timezone | pytz.BaseTzInfo] = None) -> "Job":
+        """Set a time at which the job should run.
+
+        Args:
+            time (datetime.time): The time at which the job should run.
+            timezone (Optional[datetime.timezone | pytz.BaseTzInfo]): An optional timezone for the job's scheduled time. Defaults to None.
+
+        Returns:
+            Job: The current Job instance, allowing for method chaining.
+        """
+        if self.unit not in TIME_UNITS:
+            raise exceptions.ScheduleValueError(self.unit)
+
+        if timezone is not None:
+            if not isinstance(timezone, (pytz.BaseTzInfo, datetime.tzinfo)):
+                raise ValueError(
+                    f"Invalid timezone: {timezone}. Must be a pytz timezone instance or a datetime.tzinfo instance."
+                )
+            self.at_timezone = timezone
+
+        hour: Optional[int] = None
+        minute: Optional[int] = None
+        second: Optional[int] = None
+
+        datetime.time()
+
+        if self.unit == TimeUnit.DAYS.value or self.start_day:
+            hour = using.hour
+            minute = using.minute
+            second = using.second
+
+        if self.unit == TimeUnit.HOURS.value:
+            hour = 0
+            minute = 0
+            second = using.second
+
+        if self.unit == TimeUnit.MINUTES.value:
+            hour = using.hour
+            minute = using.minute
+            second = 0
+
+        self.at_time = datetime.time(hour=hour, minute=minute, second=second)
+        return self
+
     def run(self):
         if self._job_func is None:
             raise ValueError(
@@ -351,6 +425,6 @@ def every(interval: int, tag: Optional[str] = None) -> Job:
     return default_scheduler.create_every(interval, tag)
 
 
-def run_pending_jobs():
+def run_pending():
     """Run all jobs that are scheduled to run at the current time."""
     default_scheduler.run_pending()

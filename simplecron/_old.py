@@ -513,11 +513,13 @@ class Job:
 
         if not isinstance(time_str, str):
             raise TypeError("at() should be passed a string")
+
         if self.unit == "days" or self.start_day:
             if not re.match(r"^[0-2]\d:[0-5]\d(:[0-5]\d)?$", time_str):
                 raise ScheduleValueError(
                     "Invalid time format for a daily job (valid format is HH:MM(:SS)?)"
                 )
+
         if self.unit == "hours":
             if not re.match(r"^([0-5]\d)?:[0-5]\d$", time_str):
                 raise ScheduleValueError(
@@ -529,10 +531,13 @@ class Job:
                 raise ScheduleValueError(
                     "Invalid time format for a minutely job (valid format is :SS)"
                 )
+
         time_values = time_str.split(":")
+
         hour: Union[str, int]
         minute: Union[str, int]
         second: Union[str, int]
+
         if len(time_values) == 3:
             hour, minute, second = time_values
         elif len(time_values) == 2 and self.unit == "minutes":
@@ -545,6 +550,7 @@ class Job:
         else:
             hour, minute = time_values
             second = 0
+
         if self.unit == "days" or self.start_day:
             hour = int(hour)
             if not (0 <= hour <= 23):
@@ -556,10 +562,12 @@ class Job:
         elif self.unit == "minutes":
             hour = 0
             minute = 0
+
         hour = int(hour)
         minute = int(minute)
         second = int(second)
         self.at_time = datetime.time(hour, minute, second)
+
         return self
 
     def to(self, latest: int):
@@ -949,11 +957,18 @@ def _weekday_index(day: str) -> int:
     return weekdays.index(day)
 
 
-def job(message='stuff'):
-    print("I'm working on:", message)
+def job():
+    print("I'm working!")
 
 
-every(10).minutes.do(job)
+# every(10).seconds.do(job)
+# every(10).minutes.do(job)
+# every(10).seconds.to(20).do(job)
+every(10).minutes.to(20).do(job)
+# every(10).days.at("00:00").do(job)
+# every(1).hour.at('12:00').do(job)
+# every(1).monday.at("12:00").do(job)
+# every(1).wednesday.at("08:00").do(job)
 
 while True:
     run_pending()

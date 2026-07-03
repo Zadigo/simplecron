@@ -1,4 +1,5 @@
 import time
+import datetime
 from simplecron import base
 
 
@@ -14,5 +15,5 @@ base.default_scheduler.with_event_listener(
 )
 
 while True:
-    base.run_pending_jobs()
+    base.run_pending()
     time.sleep(1)

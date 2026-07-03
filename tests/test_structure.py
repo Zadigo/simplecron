@@ -1,6 +1,6 @@
 import time
 
-from simplecron.base import every, run_pending_jobs, TimeUnit
+from simplecron.base import every, run_pending, TimeUnit
 
 
 def test_every_function():
@@ -15,6 +15,6 @@ def test_do_function(magenta):
 
     counter = 0
     while counter < 5:
-        run_pending_jobs()
+        run_pending()
         counter += 1
         time.sleep(1)

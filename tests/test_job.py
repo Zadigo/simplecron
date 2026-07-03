@@ -114,6 +114,50 @@ class TestJob:
         # Test that run() executes the job function and updates last_run and next_run
         pass
 
+    def test_at(self):
+        cases = [
+            {
+                'value': datetime.time(15, 30),
+                'unit': TimeUnit.DAYS.value,
+                'note': 'Should be "Every day at 15:30"'
+            }
+        ]
+
+        for item in cases:
+            self.job_instance.at(item['value'])
+
+    def test_add_tags(self):
+        # Test that add_tags() correctly adds tags to the job
+        self.job_instance.tags('tag1', 'tag2')
+        assert 'tag1' in self.job_instance._tags
+        assert 'tag2' in self.job_instance._tags
+
+    def test_get_label(self):
+        cases = [
+            {
+                'interval': 10,
+                'unit': TimeUnit.MINUTES.value,
+                'at_time': None,
+                'expected': "every 10 minutes",
+                'note': 'Label should be "every 10 minutes" when at_time is None'
+            },
+            {
+                'interval': 5,
+                'unit': TimeUnit.HOURS.value,
+                'at_time': datetime.time(15, 30),
+                'expected': "every 5 hours at 15:30:00",
+                'note': 'Label should be "every 5 hours at 15:30:00" when at_time is set'
+            }
+        ]
+
+        for item in cases:
+            self.job_instance.interval = item['interval']
+            self.job_instance.unit = item['unit']
+            self.job_instance.at_time = item['at_time']
+
+            label = self.job_instance._get_label()
+            assert label == item['expected'], item['note']
+
 
 class TestJobExceptions:
     @pytest.fixture(autouse=True)
