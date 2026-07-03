@@ -4,6 +4,34 @@ version = "0.1.0.dev1"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
+keywords = [
+    "cron",
+    "scheduler"
+]
+authors = [
+  {name = "John Pendenque", email = "pendenquejohn@gmail.com"},
+]
+maintainers = [
+  {name = "John Pendenque", email = "pendenquejohn@gmail.com"}
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Operating System :: POSIX",
+  "Operating System :: Unix",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "Topic :: Software Development :: Libraries",
+  "Topic :: Utilities",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Natural Language :: English",
+  "Operating System :: Microsoft :: Windows :: Windows 11",
+  "Operating System :: MacOS"
+]
+
 dependencies = [
     "pydantic>=2.13.4",
     "redis>=8.0.1",
