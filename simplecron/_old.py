@@ -957,19 +957,29 @@ def _weekday_index(day: str) -> int:
     return weekdays.index(day)
 
 
-def job():
+def something():
     print("I'm working!")
 
 
-# every(10).seconds.do(job)
-# every(10).minutes.do(job)
-# every(10).seconds.to(20).do(job)
-every(10).minutes.to(20).do(job)
-# every(10).days.at("00:00").do(job)
-# every(1).hour.at('12:00').do(job)
-# every(1).monday.at("12:00").do(job)
-# every(1).wednesday.at("08:00").do(job)
+# every(10).seconds.do(something)
+# every(10).minutes.do(something)
+# every(10).seconds.to(20).do(something)
+# every(10).minutes.to(20).do(something)
+# j = every(10).monday.at("00:30").do(something)
+# every(10).days.at("00:00").do(something)
+# every(1).hour.at('12:00').do(something)
+# every(1).monday.at("12:00").do(something)
+# every(1).wednesday.at("08:00").do(something)
+# j = every(10).friday.at("08:00").do(something)
+# j = every(1).seconds.at("08:00").do(something)
+# j1 = every(1).hours.do(something)
+j2 = every(1).hours.at("11:57").do(something)
 
 while True:
     run_pending()
+    print(j2.next_run)
     time.sleep(1)
+
+# print(j1.__repr__())
+# print(j2.__repr__())
+# print(vars(j))

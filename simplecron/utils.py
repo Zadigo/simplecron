@@ -1,5 +1,26 @@
 import datetime
 
+import enum
+
+
+class TimeUnit(enum.Enum):
+    SECONDS = "seconds"
+    MINUTES = "minutes"
+    HOURS = "hours"
+    DAYS = "days"
+    WEEKS = "weeks"
+    MONTHS = "months"
+    YEARS = "years"
+
+
+TIME_UNITS = list(map(lambda unit: unit.value, TimeUnit))
+
+
+class EventListener(enum.Enum):
+    BEFORE_ALL = "before_all"
+    BEFORE = "before"
+    AFTER = "after"
+
 
 def weekdays(day: str) -> int:
     """Convert a weekday name to its corresponding 

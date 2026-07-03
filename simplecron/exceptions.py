@@ -1,16 +1,12 @@
 
 
 class IntervalError(Exception):
-    """Raised when an invalid interval is provided for a job."""
-
     def __init__(self, value: int, expected: str = "greater than 0"):
         super().__init__(
             f"Invalid interval: {value}. Interval must be {expected}.")
 
 
 class SchedulerNotFoundError(Exception):
-    """Raised when a job is created without an associated scheduler."""
-
     message: str = "No scheduler found for the job."
 
     def __init__(self):
@@ -18,8 +14,15 @@ class SchedulerNotFoundError(Exception):
 
 
 class ScheduleValueError(Exception):
-    """Raised when a job is scheduled with an invalid value."""
-
     def __init__(self, value: int):
+        items = ['hours', 'days', 'minutes']
         super().__init__(
-            f"start_day can only be used with 'weeks' unit, not '{value}'.")
+            f"Invalid schedule value: {value}. Must be one of {', '.join(items)}."
+        )
+
+
+class AtScheduleError(Exception):
+    def __init__(self, unit: str):
+        super().__init__(
+            "Invalid unit for 'at' scheduling. The 'at' method requires the unit to be either 'hours' or 'days'."
+        )

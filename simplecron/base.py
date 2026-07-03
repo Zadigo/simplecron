@@ -5,39 +5,13 @@ import random
 import uuid
 import time
 from typing import Callable, Optional
+from warnings import warn
 from collections import defaultdict
 
 import pytz
 from simplecron import exceptions
 from simplecron.typings import TypeJobFunction
 from simplecron import utils
-
-import enum
-
-
-class TimeUnit(enum.Enum):
-    SECONDS = "seconds"
-    MINUTES = "minutes"
-    HOURS = "hours"
-    DAYS = "days"
-    WEEKS = "weeks"
-    MONTHS = "months"
-    YEARS = "years"
-
-
-TIME_UNITS = list(map(lambda unit: unit.value, TimeUnit))
-
-
-class EventListener(enum.Enum):
-    BEFORE_ALL = "before_all"
-    BEFORE = "before"
-    AFTER = "after"
-
-
-# class CycleUnit(enum.Enum):
-#     HOURLY = "hourly"
-#     MINUTELY = "minutely"
-#     SECONDLY = "secondly"
 
 
 class BaseScheduler:
@@ -68,7 +42,7 @@ class BaseScheduler:
     def get_next_run(self, tag: str = None) -> "Job":
         pass
 
-    def with_event_listener(self, event: EventListener, callback: Callable[["Job"], None]):
+    def with_event_listener(self, event: utils.EventListener, callback: Callable[["Job"], None]):
         pass
 
     def with_context(self, context: dict):
@@ -165,7 +139,7 @@ class Job:
 
     @property
     def seconds(self) -> "Job":
-        self.unit = TimeUnit.SECONDS.value
+        self.unit = utils.TimeUnit.SECONDS.value
         return self
 
     @property
@@ -176,7 +150,7 @@ class Job:
 
     @property
     def minutes(self) -> "Job":
-        self.unit = TimeUnit.MINUTES.value
+        self.unit = utils.TimeUnit.MINUTES.value
         return self
 
     def _get_label(self) -> str:
@@ -212,10 +186,10 @@ class Job:
             'microsecond': 0
         }
 
-        if self.unit == TimeUnit.DAYS.value or self.start_day is not None:
+        if self.unit == utils.TimeUnit.DAYS.value or self.start_day is not None:
             params.update(hour=self.at_time.hour, minute=self.at_time.minute)
 
-        if self.unit == TimeUnit.DAYS.value or self.unit == TimeUnit.HOURS.value or self.start_day is not None:
+        if self.unit == utils.TimeUnit.DAYS.value or self.unit == utils.TimeUnit.HOURS.value or self.start_day is not None:
             params.update(minute=self.at_time.minute)
 
         new_dt = dt.replace(**params)
@@ -271,9 +245,9 @@ class Job:
     def _schedule_next_run(self):
         """Calculate and set the next run time for the job based 
         on its interval and unit."""
-        if self.unit not in TIME_UNITS:
+        if self.unit not in utils.TIME_UNITS:
             raise ValueError(
-                f"Invalid time unit: {self.unit}. Must be one of {list(TIME_UNITS)}."
+                f"Invalid time unit: {self.unit}. Must be one of {list(utils.TIME_UNITS)}."
             )
 
         _interval = self.interval
@@ -291,7 +265,7 @@ class Job:
         _next_run = current_time
 
         if self.start_day is not None:
-            if self.unit != TimeUnit.WEEKS.value:
+            if self.unit != utils.TimeUnit.WEEKS.value:
                 raise exceptions.ScheduleValueError(self.unit)
             _next_run = utils.move_to_next_weekday(_next_run, self.start_day)
 
@@ -360,6 +334,34 @@ class Job:
     def at(self, using: datetime.time, timezone: Optional[datetime.timezone | pytz.BaseTzInfo] = None) -> "Job":
         """Set a time at which the job should run.
 
+        ## Example
+
+        To schedule a job to run every day specifically at `14:30`, you can use the following code::
+
+            import datetime
+            import simplecron
+
+            simplecron.every(1).days.at(datetime.time(14, 30)).do(my_job_function)
+
+        To schedule a job to run every day at `14:30` in a specific timezone, you can use the following code::
+
+            import datetime
+            import pytz
+            import simplecron
+
+            timezone = pytz.timezone('America/New_York')
+            simplecron.every(1).days.at(datetime.time(14, 30), timezone=timezone).do(my_job_function)
+
+        To schedule a job to run every hour and specifically at `01:30`::
+
+            import datetime
+            import simplecron
+
+            simplecron.every(1).hours.at(datetime.time(1, 30)).do(my_job_function)
+
+        Using `hours` and `minutes` units will fixate the time to the specified hour and minute. For instance, in the above
+        example, the job will run every hour and ...
+
         Args:
             time (datetime.time): The time at which the job should run.
             timezone (Optional[datetime.timezone | pytz.BaseTzInfo]): An optional timezone for the job's scheduled time. Defaults to None.
@@ -367,8 +369,9 @@ class Job:
         Returns:
             Job: The current Job instance, allowing for method chaining.
         """
-        if self.unit not in TIME_UNITS:
-            raise exceptions.ScheduleValueError(self.unit)
+        warn("This method is not complete. Use with caution. The 'at' method is intended to set a specific time for the job to run, but it may not handle all edge cases correctly.")
+        if self.unit not in [utils.TimeUnit.DAYS.value, utils.TimeUnit.HOURS.value, utils.TimeUnit.MINUTES.value] and self.start_day is None:
+            raise exceptions.AtScheduleError(self.unit)
 
         if timezone is not None:
             if not isinstance(timezone, (pytz.BaseTzInfo, datetime.tzinfo)):
@@ -381,19 +384,17 @@ class Job:
         minute: Optional[int] = None
         second: Optional[int] = None
 
-        datetime.time()
-
-        if self.unit == TimeUnit.DAYS.value or self.start_day:
+        if self.unit == utils.TimeUnit.DAYS.value or self.start_day:
             hour = using.hour
             minute = using.minute
             second = using.second
 
-        if self.unit == TimeUnit.HOURS.value:
+        if self.unit == utils.TimeUnit.HOURS.value:
             hour = 0
             minute = 0
             second = using.second
 
-        if self.unit == TimeUnit.MINUTES.value:
+        if self.unit == utils.TimeUnit.MINUTES.value:
             hour = using.hour
             minute = using.minute
             second = 0

@@ -1,22 +1,14 @@
-import asyncio
+import time
+import datetime
+from simplecron import base
 
 
-async def google():
-    while True:
-        print("Hello, World 1!")
-        await asyncio.sleep(1)
+def some_func(job: base.Job, *args, **kwargs):
+    print("Hello, World!", job)
 
 
-async def facebook():
-    while True:
-        print("Hello, World 2!")
-        await asyncio.sleep(3)
+base.every(30).minutes.at(datetime.time(0, 0)).do(some_func)
 
-
-async def main():
-    async with asyncio.TaskGroup() as tg:
-        tg.create_task(google())
-        tg.create_task(facebook())
-
-if __name__ == "__main__":
-    asyncio.run(main())
+while True:
+    base.run_pending()
+    time.sleep(1)

@@ -116,15 +116,23 @@ class TestJob:
 
     def test_at(self):
         cases = [
+            # {
+            #     'value': datetime.time(15, 30),
+            #     'unit': TimeUnit.DAYS.value,
+            #     'label': "every 10 days at 15:30:00"
+            # },
             {
-                'value': datetime.time(15, 30),
-                'unit': TimeUnit.DAYS.value,
-                'note': 'Should be "Every day at 15:30"'
+                'value': datetime.time(8, 0),
+                'unit': TimeUnit.HOURS.value,
+                'label': "every 10 hours at 08:00:00"
             }
         ]
 
         for item in cases:
+            self.job_instance.unit = item['unit']
             self.job_instance.at(item['value'])
+
+            assert self.job_instance.at_time == item['value']
 
     def test_add_tags(self):
         # Test that add_tags() correctly adds tags to the job
@@ -147,6 +155,27 @@ class TestJob:
                 'at_time': datetime.time(15, 30),
                 'expected': "every 5 hours at 15:30:00",
                 'note': 'Label should be "every 5 hours at 15:30:00" when at_time is set'
+            },
+            {
+                'interval': 5,
+                'unit': TimeUnit.HOURS.value,
+                'at_time': None,
+                'expected': "every 5 hours",
+                'note': 'Label should be "every 5 hours" when at_time is None'
+            },
+            {
+                'interval': 1,
+                'unit': TimeUnit.DAYS.value,
+                'at_time': datetime.time(8, 0),
+                'expected': "every 1 days at 08:00:00",
+                'note': 'Label should be "every 1 days at 08:00:00" when at_time is set'
+            },
+            {
+                'interval': 3,
+                'unit': TimeUnit.DAYS.value,
+                'at_time': datetime.time(8, 0),
+                'expected': "every 3 days at 08:00:00",
+                'note': 'Label should be "every 3 days at 08:00:00" when at_time is set'
             }
         ]
 
