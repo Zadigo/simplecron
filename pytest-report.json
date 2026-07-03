@@ -1,12 +1,6 @@
 {"pytest_version": "9.1.1", "$report_type": "SessionStart"}
 {"nodeid": "", "outcome": "passed", "longrepr": null, "result": null, "sections": [], "$report_type": "CollectReport"}
-{"nodeid": "simplecron", "outcome": "passed", "longrepr": null, "result": null, "sections": [], "$report_type": "CollectReport"}
-{"nodeid": "tests/test_job.py::TestJob", "outcome": "passed", "longrepr": null, "result": null, "sections": [], "$report_type": "CollectReport"}
-{"nodeid": "tests/test_job.py::TestJobExceptions", "outcome": "passed", "longrepr": null, "result": null, "sections": [], "$report_type": "CollectReport"}
-{"nodeid": "tests/test_job.py", "outcome": "passed", "longrepr": null, "result": null, "sections": [], "$report_type": "CollectReport"}
-{"nodeid": "tests/test_scheduler.py::TestBaseScheduler", "outcome": "passed", "longrepr": null, "result": null, "sections": [], "$report_type": "CollectReport"}
-{"nodeid": "tests/test_scheduler.py", "outcome": "passed", "longrepr": null, "result": null, "sections": [], "$report_type": "CollectReport"}
-{"nodeid": "tests/test_structure.py", "outcome": "passed", "longrepr": null, "result": null, "sections": [], "$report_type": "CollectReport"}
-{"nodeid": "tests", "outcome": "passed", "longrepr": null, "result": null, "sections": [], "$report_type": "CollectReport"}
-{"nodeid": ".", "outcome": "passed", "longrepr": null, "result": null, "sections": [], "$report_type": "CollectReport"}
+{"nodeid": "tests/test_job.py::TestJob::test_schedule_next_run", "location": ["tests/test_job.py", 75, "TestJob.test_schedule_next_run"], "keywords": {"test_schedule_next_run": 1, "TestJob": 1, "test_job.py": 1, "tests": 1, "simplecron": 1, "": 1}, "outcome": "passed", "longrepr": null, "when": "setup", "user_properties": [], "sections": [], "duration": 0.0008718760218471289, "start": 1783076115.419296, "stop": 1783076115.420168, "$report_type": "TestReport"}
+{"nodeid": "tests/test_job.py::TestJob::test_schedule_next_run", "location": ["tests/test_job.py", 75, "TestJob.test_schedule_next_run"], "keywords": {"test_schedule_next_run": 1, "TestJob": 1, "test_job.py": 1, "tests": 1, "simplecron": 1, "": 1}, "outcome": "passed", "longrepr": null, "when": "call", "user_properties": [], "sections": [], "duration": 0.030261996027547866, "start": 1783076115.420875, "stop": 1783076115.451137, "$report_type": "TestReport"}
+{"nodeid": "tests/test_job.py::TestJob::test_schedule_next_run", "location": ["tests/test_job.py", 75, "TestJob.test_schedule_next_run"], "keywords": {"test_schedule_next_run": 1, "TestJob": 1, "test_job.py": 1, "tests": 1, "simplecron": 1, "": 1}, "outcome": "passed", "longrepr": null, "when": "teardown", "user_properties": [], "sections": [], "duration": 0.00015726103447377682, "start": 1783076115.451669, "stop": 1783076115.4518259, "$report_type": "TestReport"}
 {"exitstatus": 0, "$report_type": "SessionFinish"}

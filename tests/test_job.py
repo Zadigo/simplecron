@@ -2,26 +2,109 @@ import pytest
 from simplecron.base import Job, TimeUnit
 from simplecron import exceptions
 import datetime
+import pytz
 
 
 class TestJob:
     @pytest.fixture(autouse=True)
     def setup(self):
-        self.job_instance = Job(interval=10)
+        self._base_interval = 10
+        self.job_instance = Job(interval=self._base_interval)
+
+    def test_move_to_at_time(self):
+        cases = [
+            {
+                'value': datetime.datetime(2024, 6, 1, 12, 0, tzinfo=datetime.timezone.utc),
+                'at_time': datetime.time(15, 30),
+                'expected': datetime.datetime(2024, 6, 1, 12, 0, tzinfo=datetime.timezone.utc),
+                'note': 'Expect original value when at_time is set and unit is None',
+                'unit': None
+            },
+            {
+                'value': datetime.datetime(2024, 6, 1, 12, 0, tzinfo=datetime.timezone.utc),
+                'at_time': datetime.time(15, 30),
+                'expected': datetime.datetime(2024, 6, 1, 12, 30, tzinfo=datetime.timezone.utc),
+                'note': 'Expect value moved to at_time when unit is set to HOURS e.g. 12:00 -> 12:30',
+                'unit': TimeUnit.HOURS.value
+            },
+            {
+                'value': datetime.datetime(2024, 6, 1, 12, 0, tzinfo=datetime.timezone.utc),
+                'at_time': datetime.time(15, 30),
+                'expected': datetime.datetime(2024, 6, 1, 15, 30, tzinfo=datetime.timezone.utc),
+                'note': 'Expect value moved to at_time when unit is set to DAYS e.g. 12:00 -> 15:30',
+                'unit': TimeUnit.DAYS.value
+            }
+        ]
+
+        for item in cases:
+            self.job_instance.at_timezone = pytz.UTC
+            self.job_instance.at_time = item['at_time']
+            self.job_instance.unit = item['unit']
+
+            result = self.job_instance._move_to_at_time(item['value'])
+            assert result == item['expected'], item['note']
 
     def test_utc_offset_correction(self):
-        # Test that _utc_offset_correction correctly adjusts the datetime based on the job's timezone
-        pass
+        cases = [
+            {
+                'value': datetime.datetime(2024, 6, 1, 12, 0, tzinfo=datetime.timezone.utc),
+                'expected': datetime.datetime(2024, 6, 1, 12, 0, tzinfo=datetime.timezone.utc),
+                'note': 'No offset change expected for UTC time',
+                'at_timezone': None,
+                'restore': False
+            },
+            {
+                'value': datetime.datetime(2024, 6, 1, 12, 0, tzinfo=datetime.timezone(datetime.timedelta(hours=-5))),
+                'expected': datetime.datetime(2024, 6, 1, 12, 0, tzinfo=datetime.timezone(datetime.timedelta(hours=-5))),
+                'note': 'No offset change expected for EST time',
+                'at_timezone': pytz.UTC,
+                'restore': True
+            },
+        ]
+
+        for item in cases:
+            if item['at_timezone'] is not None:
+                self.job_instance.at_timezone = item['at_timezone']
+
+            result = self.job_instance._utc_offset_correction(
+                item['value'],
+                restore_time=item['restore']
+            )
+
+            assert result == item['expected'], item['note']
 
     def test_schedule_next_run(self):
-        self.job_instance.unit = TimeUnit.MINUTES.value
-        self.job_instance._schedule_next_run()
+        cases = [
+            {
+                'unit': TimeUnit.MINUTES.value,
+                'start_day': None,
+                'expected': datetime.datetime.now(pytz.UTC) + datetime.timedelta(minutes=self._base_interval),
+                'note': 'Next run should be scheduled 10 minutes from now when unit is MINUTES'
+            },
+            {
+                'unit': TimeUnit.HOURS.value,
+                'start_day': None,
+                'expected': datetime.datetime.now(pytz.UTC) + datetime.timedelta(hours=self._base_interval),
+                'note': 'Next run should be scheduled 10 hours from now when unit is HOURS'
+            },
+            {
+                'unit': TimeUnit.WEEKS.value,
+                'start_day': 'wednesday',
+                'expected': datetime.datetime.now(pytz.UTC) + datetime.timedelta(days=7),
+                'note': 'Next run should be scheduled to the next Wednesday when unit is WEEKS and start_day is set'
+            }
+        ]
 
-        assert self.job_instance.next_run is not None
-        assert (
-            self.job_instance.next_run > datetime.datetime.now(
-                self.job_instance.at_timezone)
-        )
+        for item in cases:
+            current_date = datetime.datetime.now(pytz.UTC)
+
+            self.job_instance.unit = item['unit']
+            self.job_instance.start_day = item['start_day']
+
+            self.job_instance._schedule_next_run()
+
+            assert self.job_instance.next_run is not None, item['note']
+            assert self.job_instance.next_run > current_date, item['note']
 
     def test_do(self):
         # Test that do() correctly assigns the job function and schedules the next run

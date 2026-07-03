@@ -79,6 +79,21 @@ class Job:
     Args:
         internal (int): The interval in seconds at which the job should run.
         scheduler (Optional[BaseScheduler]): The scheduler instance to which the job belongs. If not provided, the default scheduler will be used.
+
+    Attributes:
+        interval (int): The interval in seconds at which the job should run.
+        scheduler (Optional[BaseScheduler]): The scheduler instance to which the job belongs. If not provided, the default scheduler will be used.
+        _job_func (TypeJobFunction): The function to be executed when the job runs. It can be a callable or a Job instance.
+        latest (Optional[datetime.time]): The latest time at which the job should run (if specified).
+        unit (Optional[str]): The unit of time for the job's interval (e.g., seconds, minutes, hours).
+        at_time (Optional[datetime.time]): The time at which the job should run (if specified).
+        at_timezone (Optional[datetime.timezone]): An optional timezone for the job's scheduled time.
+        last_run (Optional[datetime.datetime]): The datetime of the last time the job was run.
+        next_run (Optional[datetime.datetime]): The next scheduled run time for the job.
+        start_day (Optional[str]): The weekday on which the job should run (if specified) for example when using "every week on tuesday", the start day would be "tuesday".
+        cancel_after (Optional[datetime.datetime]): An optional time of final run.
+        tags (set[str]): A set of tags associated with the job.
+        job_uuid (uuid.UUID): A unique identifier for the job, used for tracking and management.
     """
 
     def __init__(self, interval: int, scheduler: Optional[BaseScheduler] = None):
@@ -171,17 +186,24 @@ class Job:
         }
 
         if self.unit == TimeUnit.DAYS.value or self.start_day is not None:
-            params.update(hour=self.at_time.hour)
+            params.update(hour=self.at_time.hour, minute=self.at_time.minute)
 
         if self.unit == TimeUnit.DAYS.value or self.unit == TimeUnit.HOURS.value or self.start_day is not None:
             params.update(minute=self.at_time.minute)
 
         new_dt = dt.replace(**params)
-        corrected_dt = self._utc_offset_correction(new_dt, fixate_time=True)
+        corrected_dt = self._utc_offset_correction(new_dt, restore_time=True)
         return corrected_dt
 
-    def _utc_offset_correction(self, dt: datetime.datetime, fixate_time: bool = False) -> datetime.datetime:
-        """Adjust the given datetime to account for UTC offset based on the job's timezone."""
+    def _utc_offset_correction(self, dt: datetime.datetime, restore_time: bool = False) -> datetime.datetime:
+        """This function provides the option to keep the same wall-clock time even after correcting 
+        the offset. For instance in the case of this hypothesis "run this job every day at 02:30 local time"
+        and where we want 02:30, not whatever time that `datetime.normalize` decides.
+
+        Args:
+            dt (datetime.datetime): The datetime to be corrected.
+            restore_time (bool): If True, the function will attempt to restore the original wall-clock time after correcting the UTC offset. Defaults to False.
+        """
         # Normalize corrects the utc-offset to match the timezone
         # For example: When a date&time&offset does not exist within a timezone,
         # the normalization will change the utc-offset to where it is valid.
@@ -195,13 +217,20 @@ class Job:
         if before_value == after_value:
             return moment
 
-        if not fixate_time:
+        if not restore_time:
             return moment
 
+        # Calculate the difference in utc-offset and adjust
+        # the moment to fixate the time
         difference = after_value - before_value
         # Adjust the moment to fixate the time,
         # keeping the original time component intact
         moment -= difference
+
+        if self.at_timezone is None:
+            raise ValueError(
+                "at_timezone must be set for UTC offset correction.")
+
         renormalized_moment = self.at_timezone.normalize(moment)
         if renormalized_moment != after_value:
             # We ended up in a DST Gap. The requested 'at' time does not exist
@@ -239,22 +268,24 @@ class Job:
                 raise exceptions.ScheduleValueError(self.unit)
             _next_run = utils.move_to_next_weekday(_next_run, self.start_day)
 
-        if self.at_time is not None:
-            _next_run = None
-
-        # Calculate the next run time based on the interval and unit
+        # Delta to add to the current time to get the next run time
         period = datetime.timedelta(**{self.unit: _interval})
 
-        # If the interval is not 1, we need to a
-        # dd the period to the next run time
+        # If the interval is not 1, we need to 
+        # add the period to the next run time
         if _interval != 1:
             _next_run += period
 
-        # Adjust the next run time to ensure it is in the future
+        # In the case where the next run time is in the past, 
+        # we need to keep adding the period so that the next run 
+        # time is in the future
         while _next_run <= current_time:
             _next_run += period
 
-        self.next_run = _next_run
+        self.next_run = self._utc_offset_correction(
+            _next_run,
+            restore_time=self.at_time is not None
+        )
 
     def do(self, job_func: TypeJobFunction, *args, **kwargs) -> "Job":
         """Assign a function to be executed when the job runs
