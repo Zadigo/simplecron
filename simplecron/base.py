@@ -2,10 +2,10 @@ import asyncio
 import datetime
 import functools
 import random
+import uuid
 import time
 from typing import Callable, Optional
-import uuid
-
+from collections import defaultdict
 from simplecron import exceptions
 from simplecron.typings import TypeJobFunction
 from simplecron import utils
@@ -139,7 +139,13 @@ class Job:
 
     @property
     def should_run(self) -> bool:
-        return datetime.datetime.now() >= self.next_run
+        if self.next_run is None:
+            return False
+
+        # Determine the timezone to use for comparison. If the job has a specific
+        # timezone set, use that; otherwise, default to UTC.
+        timezone = self.next_run.tzinfo or self.at_timezone or datetime.timezone.utc
+        return datetime.datetime.now(timezone) >= self.next_run
 
     @property
     def second(self) -> "Job":
@@ -271,13 +277,13 @@ class Job:
         # Delta to add to the current time to get the next run time
         period = datetime.timedelta(**{self.unit: _interval})
 
-        # If the interval is not 1, we need to 
+        # If the interval is not 1, we need to
         # add the period to the next run time
         if _interval != 1:
             _next_run += period
 
-        # In the case where the next run time is in the past, 
-        # we need to keep adding the period so that the next run 
+        # In the case where the next run time is in the past,
+        # we need to keep adding the period so that the next run
         # time is in the future
         while _next_run <= current_time:
             _next_run += period
@@ -348,13 +354,3 @@ def every(interval: int, tag: Optional[str] = None) -> Job:
 def run_pending_jobs():
     """Run all jobs that are scheduled to run at the current time."""
     default_scheduler.run_pending()
-
-
-class RunningScheduler:
-    async def __call__(self, *jobs: "Job"):
-        try:
-            while True:
-                run_pending_jobs()
-                await asyncio.sleep(1)
-        except KeyboardInterrupt:
-            print("Scheduler stopped.")
