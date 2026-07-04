@@ -1,6 +1,7 @@
 import time
 
-from simplecron.base import every, run_pending, TimeUnit
+from simplecron.base import every, run_pending
+from simplecron.utils import TimeUnit
 
 
 def test_every_function():

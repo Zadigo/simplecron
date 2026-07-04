@@ -1,5 +1,6 @@
 import pytest
-from simplecron.base import Job, TimeUnit
+from simplecron.base import Job
+from simplecron.utils import TimeUnit
 from simplecron import exceptions
 import datetime
 import pytz

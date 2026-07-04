@@ -11,6 +11,14 @@ class Context:
     def add(self, key: str, value: Any):
         setattr(self, key, value)
 
+    def remove(self, key: str):
+        if hasattr(self, key):
+            delattr(self, key)
+
+    def get_all(self) -> list[tuple[str, Any]]:
+        clean_values = filter(lambda x: not x.startswith("__"), dir(self))
+        return [(key, getattr(self, key)) for key in clean_values if not callable(getattr(self, key))]
+
 
 class Schedulers:
     """A class to manage multiple schedulers and run them in a blocking manner."""

@@ -10,34 +10,66 @@ from collections import defaultdict
 
 import pytz
 from simplecron import exceptions
-from simplecron.typings import TypeJobFunction
+from simplecron.typings import TypeJobFunction, TypeJobReturn
 from simplecron import utils
+
+
+class Cancel:
+    """A class representing a cancellation signal for jobs.
+
+    This class is used to indicate that a job should be canceled. It can be returned from a job function 
+    to signal that the job should not be rescheduled::
+
+        def my_job():
+            if some_condition:
+                return Cancel()  # Signal to cancel the job
+    """
+
+    def __init__(self, job: "Job", reason: str = None):
+        self.job = job
+        self.reason = reason
+
+        if not self.job.is_cancelled:
+            self.job.is_cancelled = True
 
 
 class BaseScheduler:
     def __init__(self):
-        self.jobs: list["Job"] = []
+        self._jobs: list["Job"] = []
 
     def _run_job(self, job: "Job"):
         result = job.run()
+        if isinstance(result, Cancel):
+            self._cancel_job(job)
+
+    def _cancel_job(self, job: "Job"):
+        if job in self._jobs:
+            self._jobs.remove(job)
 
     def jobs(self, tag: str = None) -> list["Job"]:
-        pass
+        if tag is not None:
+            return [job for job in self._jobs if tag in job._tags]
+        return self._jobs
 
     def run_pending(self):
         """Run all jobs that are scheduled to run at the current time."""
-        _jobs = sorted(filter(lambda job: job.should_run, self.jobs))
+        _jobs = sorted(filter(lambda job: job.should_run, self._jobs))
         for job in _jobs:
             self._run_job(job)
 
     def run_all(self):
-        pass
+        for job in self._jobs:
+            self._run_job(job)
 
     def clear(self):
-        pass
+        self._jobs.clear()
 
     def create_every(self, interval: int, tag: str = None) -> "Job":
-        return Job(interval, self)
+        job = Job(interval, self)
+        if tag:
+            job._tags.add(tag)
+        self._jobs.append(job)
+        return job
 
     def get_next_run(self, tag: str = None) -> "Job":
         pass
@@ -113,6 +145,9 @@ class Job:
         # Unique identifier for the job, used for tracking and management
         self.job_uuid = uuid.uuid4()
 
+        self.is_cancelled = False
+        self.was_executed = False
+
     def __repr__(self):
         return f"<Job(interval={self.interval}, unit={self.unit}, next_run={self.next_run})>"
 
@@ -120,6 +155,9 @@ class Job:
         if not isinstance(other, Job):
             return NotImplemented
         return self.next_run < other.next_run
+
+    def __hash__(self):
+        return hash((self.job_uuid, self._get_label(as_slug=True)))
 
     @property
     def should_run(self) -> bool:
@@ -153,16 +191,20 @@ class Job:
         self.unit = utils.TimeUnit.MINUTES.value
         return self
 
-    def _get_label(self) -> str:
+    def _get_label(self, as_slug: bool = False) -> str:
         """Generate a human-readable label for the job, describing its schedule."""
         if self.at_time is not None:
-            return self.label_template.format(
+            text = self.label_template.format(
                 interval=self.interval,
                 unit=self.unit,
                 at_time=self.at_time.strftime("%H:%M:%S")
             )
         else:
-            return f"every {self.interval} {self.unit}"
+            text = f"every {self.interval} {self.unit}"
+
+        if as_slug:
+            return text.replace(" ", "-").lower()
+        return text
 
     def _move_to_at_time(self, dt: datetime.datetime) -> datetime.datetime:
         """Move the given datetime to the specified 'at_time' if it is set.
@@ -247,7 +289,9 @@ class Job:
         on its interval and unit."""
         if self.unit not in utils.TIME_UNITS:
             raise ValueError(
-                f"Invalid time unit: {self.unit}. Must be one of {list(utils.TIME_UNITS)}."
+                f"Invalid time unit: {self.unit}. Must be one of {list(utils.TIME_UNITS)}. "
+                "Before calling this method, you must call one of the unit propperties "
+                "(e.g., seconds, minutes, hours, days, weeks)."
             )
 
         _interval = self.interval
@@ -328,7 +372,7 @@ class Job:
         if self.scheduler is None:
             raise exceptions.SchedulerNotFoundError()
 
-        self.scheduler.jobs.append(self)
+        self.scheduler._jobs.append(self)
         return self
 
     def at(self, using: datetime.time, timezone: Optional[datetime.timezone | pytz.BaseTzInfo] = None) -> "Job":
@@ -402,14 +446,17 @@ class Job:
         self.at_time = datetime.time(hour=hour, minute=minute, second=second)
         return self
 
-    def run(self):
+    def run(self) -> TypeJobReturn:
         if self._job_func is None:
             raise ValueError(
                 "No job function assigned. Use the 'do' method to assign a function.")
 
         result = self._job_func(self)
+
         self.last_run = datetime.datetime.now()
         self._schedule_next_run()
+
+        self.was_executed = True
         return result
 
 
