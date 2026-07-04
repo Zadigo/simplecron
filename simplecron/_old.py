@@ -976,13 +976,13 @@ def something():
 # j1 = every(1).hours.do(something)
 # j2 = every(1).hours.at("11:57").do(something)
 
-j1 = every(1).day.do(something)
+j1 = every(1).tuesday.do(something)
 
-# print(j1.__repr__())
+print(j1.__repr__())
 
-while True:
-    run_pending()
-    time.sleep(1)
+# while True:
+#     run_pending()
+#     time.sleep(1)
 
 # print(j1.__repr__())
 # print(j2.__repr__())

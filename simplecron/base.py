@@ -246,8 +246,9 @@ class Job:
         self.last_run: Optional[datetime.datetime] = None
         # The next scheduled run time for the job
         self.next_run: Optional[datetime.datetime] = None
-        # Weekday on which the job should run (if specified) for example
-        # when using "every week on tuesday", the start day would be "tuesday"
+        # If specified, the weekday on which the job should run
+        # (for example when using "every week on tuesday",
+        # the start day would be "tuesday")
         self.start_day: Optional[str] = None
         # Optional time of final run
         self.cancel_after: Optional[datetime.datetime] = None
@@ -338,11 +339,95 @@ class Job:
                 expected="equal to 1"
             )
         return self.days
-    
+
     @property
     def days(self) -> "Job":
         self.unit = utils.TimeUnit.DAYS.value
         return self
+
+    @property
+    def week(self) -> "Job":
+        if self.interval != 1:
+            raise exceptions.IntervalError(
+                self.interval,
+                expected="equal to 1"
+            )
+        return self.weeks
+
+    @property
+    def weeks(self) -> "Job":
+        self.unit = utils.TimeUnit.WEEKS.value
+        return self
+
+    @property
+    def monday(self) -> "Job":
+        if self.interval != 1:
+            raise exceptions.IntervalError(
+                self.interval,
+                expected="equal to 1"
+            )
+        self.start_day = 'monday'
+        return self.weeks
+
+    @property
+    def tuesday(self) -> "Job":
+        if self.interval != 1:
+            raise exceptions.IntervalError(
+                self.interval,
+                expected="equal to 1"
+            )
+        self.start_day = 'tuesday'
+        return self.weeks
+
+    @property
+    def wednesday(self) -> "Job":
+        if self.interval != 1:
+            raise exceptions.IntervalError(
+                self.interval,
+                expected="equal to 1"
+            )
+        self.start_day = 'wednesday'
+        return self.weeks
+
+    @property
+    def thursday(self) -> "Job":
+        if self.interval != 1:
+            raise exceptions.IntervalError(
+                self.interval,
+                expected="equal to 1"
+            )
+        self.start_day = 'thursday'
+        return self.weeks
+
+    @property
+    def friday(self) -> "Job":
+        if self.interval != 1:
+            raise exceptions.IntervalError(
+                self.interval,
+                expected="equal to 1"
+            )
+        self.start_day = 'friday'
+        return self.weeks
+
+    @property
+    def saturday(self) -> "Job":
+        if self.interval != 1:
+            raise exceptions.IntervalError(
+                self.interval,
+                expected="equal to 1"
+            )
+        self.start_day = 'saturday'
+        return self.weeks
+
+    @property
+    def sunday(self) -> "Job":
+        if self.interval != 1:
+            raise exceptions.IntervalError(
+                self.interval,
+                expected="equal to 1"
+            )
+        self.start_day = 'sunday'
+        return self.weeks
 
     def _get_label(self, as_slug: bool = False) -> str:
         """Generate a human-readable label for the job, describing its schedule."""
@@ -353,7 +438,10 @@ class Job:
                 at_time=self.at_time.strftime("%H:%M:%S")
             )
         else:
-            text = f"every {self.interval} {self.unit}"
+            _unit = self.unit
+            if (self.interval is not None and self.interval == 1) and _unit is not None:
+                _unit = _unit.removesuffix("s")
+            text = f"every {self.interval} {_unit}"
 
         if as_slug:
             return text.replace(" ", "-").lower()
