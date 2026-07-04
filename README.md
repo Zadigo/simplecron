@@ -6,10 +6,11 @@ Simplecron is a simple and lightweight Python library for scheduling tasks using
 
 ### Default scheduler
 
-In simple situations, you can use the default scheduler to schedule your jobs. The default scheduler runs in the main thread and is suitable for simple use cases.
+Simplecron uses a default scheduler that is created when the library is imported. You can create jobs using the `every` function, which creates a new job instance and attaches it to the default scheduler.
 
 ```Python
 from simplecron import base
+
 
 def callback(job: base.Job, *args, **kwargs):
     print("Hello, World!", job)
@@ -19,7 +20,7 @@ base.every(1).second.do(callback)
 
 
 while True:
-    base.run_pending_jobs()
+    base.run_pending()
     time.sleep(1)
 ```
 
@@ -140,3 +141,97 @@ from simplecron.utils import EventListenerEnum
 def before_all_jobs(jobs):
 	print("Before all jobs:", jobs)
 ``` -->
+
+## Jobs
+
+### Cancelling
+
+To cancel a job, it simple needs to return an instance of `Cancel`.
+
+```python
+def callback(job: Job, *args, **kwargs):
+	print("Hello, World!", job)
+	return Cancel(job, reason="Some reason")  # This will cancel the job after it runs once
+```
+
+### Types of jobs
+
+**Every second**
+
+```python
+default_scheduler.every(1).second.do(callback)
+```
+
+**Every X second**
+
+```python
+default_scheduler.every(15).seconds.do(callback)
+```
+
+**Every minute**
+
+```python
+default_scheduler.every(1).minute.do(callback)
+```
+
+**Every X minutes**
+
+```python
+default_scheduler.every(15).minutes.do(callback)
+```
+
+**Every hour**
+
+```python
+default_scheduler.every(1).hour.do(callback)
+```
+
+**Every hours**
+
+```python
+default_scheduler.every(1).hours.do(callback)
+```
+
+**Every day**
+
+When no specific time is provided, the job will run automatically at the start of the day (00:00). If you need to run the job at a specific time, you must use the `at` method to specify the time in 24-hour format (HH:MM).
+
+```python
+default_scheduler.every(1).day.do(callback)
+```
+
+```python
+default_scheduler.every(1).day.at(datetime.time(12, 00)).do(callback)
+```
+
+**Every days**
+
+```python
+default_scheduler.every(1).days.do(callback)
+```
+
+**Every week**
+
+If not specific day and time is povided, the job will run automatically at the start of the week (Monday at 00:00). If you need to run the job at a specific day, you must use one of the properties `monday`, `tuesday`, `wednesday`, `thursday`, `friday`, `saturday` or `sunday`.
+
+You can also use the `at` method to specify the time in 24-hour format (HH:MM).
+
+```python
+default_scheduler.every(1).week.do(callback)
+```
+
+```python
+default_scheduler.every(1).week.at(datetime.time(12, 00)).do(callback)
+```
+
+**Every X day**
+
+```python
+default_scheduler.every(1).monday.do(callback)
+default_scheduler.every(1).tuesday.do(callback)
+default_scheduler.every(1).wednesday.do(callback)
+default_scheduler.every(1).thursday.do(callback)
+default_scheduler.every(1).friday.do(callback)
+default_scheduler.every(1).saturday.do(callback)
+default_scheduler.every(1).sunday.do(callback)
+```

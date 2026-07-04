@@ -116,7 +116,8 @@ class TestJob:
         pass
 
     def test_at(self):
-        pytest.skip("Skipping test_at() as it requires more complex setup for time mocking.")
+        pytest.skip(
+            "Skipping test_at() as it requires more complex setup for time mocking.")
         cases = [
             # {
             #     'value': datetime.time(15, 30),
@@ -217,6 +218,27 @@ class TestJob:
 
         assert job1 not in job_set, "job1 should be removed from the set"
 
+    def test_should_run(self):
+        j1 = Job(interval=10)
+
+        # None if next_run is None
+        j1.next_run = None
+        assert j1.should_run is False, "Job should not run if next_run is None"
+
+        # False if date in the future
+        j1.next_run = (
+            datetime.datetime.now(pytz.UTC) +
+            datetime.timedelta(seconds=10)
+        )
+        assert j1.should_run is False, "Job should not run if next_run is in the future"
+
+        # True if date in the past
+        j1.next_run = (
+            datetime.datetime.now(pytz.UTC) -
+            datetime.timedelta(seconds=10)
+        )
+        assert j1.should_run is True, "Job should run if next_run is in the past"
+
 
 class TestJobExceptions:
     @pytest.fixture(autouse=True)
@@ -224,8 +246,15 @@ class TestJobExceptions:
         self.job_instance = Job(interval=10)
 
     def test_interval_error(self):
-        # Test that IntervalError is raised for invalid intervals
-        pass
+        # Running a job every minute: interval should be one
+        with pytest.raises(exceptions.IntervalError):
+            self.job_instance.interval = 2
+            self.job_instance.minute
+
+        # Running a job every second: interval should be one
+        with pytest.raises(exceptions.IntervalError):
+            self.job_instance.interval = 2
+            self.job_instance.second
 
     def test_scheduler_not_found_error(self):
         # Test that SchedulerNotFoundError is raised when a job is created without an associated scheduler

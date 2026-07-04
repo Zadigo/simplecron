@@ -1,7 +1,9 @@
 import datetime
 import time
 
-from simplecron import utils
+import pytest
+
+from simplecron import exceptions, utils
 from simplecron.base import BaseScheduler, Job, Cancel
 
 
@@ -178,3 +180,16 @@ class TestBaseScheduler:
         for _, listeners in s.event_listeners.items():
             for listener in listeners:
                 assert listener.counter > 0
+
+    def test_calling_order(self):
+        s = BaseScheduler()
+
+        # Calling `do` without calling the unit property
+        # should raise an IntervalError
+        with pytest.raises(Exception):
+            s.create_every(1).do(executor)
+
+        s.create_every(1).minute.do(executor)
+
+        # Correct calling order: every -> unit -> do
+        s.create_every(1).minutes.do(executor)

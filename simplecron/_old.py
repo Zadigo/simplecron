@@ -961,7 +961,8 @@ def something():
     print("I'm working!")
 
 
-every(10).seconds.do(something)
+# every(1).second.do(something)
+# every(10).seconds.do(something)
 # every(10).minutes.do(something)
 # every(10).seconds.to(20).do(something)
 # every(10).minutes.to(20).do(something)
@@ -975,9 +976,12 @@ every(10).seconds.do(something)
 # j1 = every(1).hours.do(something)
 # j2 = every(1).hours.at("11:57").do(something)
 
+j1 = every(1).day.do(something)
+
+# print(j1.__repr__())
+
 while True:
     run_pending()
-    print(j2.next_run)
     time.sleep(1)
 
 # print(j1.__repr__())

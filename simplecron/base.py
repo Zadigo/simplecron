@@ -290,8 +290,11 @@ class Job:
 
     @property
     def second(self) -> "Job":
-        if self.interval < 1:
-            raise exceptions.IntervalError(self.interval)
+        if self.interval != 1:
+            raise exceptions.IntervalError(
+                self.interval,
+                expected="equal to 1"
+            )
         return self.seconds
 
     @property
@@ -301,13 +304,44 @@ class Job:
 
     @property
     def minute(self) -> "Job":
-        if self.interval < 1:
-            raise exceptions.IntervalError(self.interval)
+        if self.interval != 1:
+            raise exceptions.IntervalError(
+                self.interval,
+                expected="equal to 1"
+            )
         return self.minutes
 
     @property
     def minutes(self) -> "Job":
         self.unit = utils.TimeUnit.MINUTES.value
+        return self
+
+    @property
+    def hour(self) -> "Job":
+        if self.interval != 1:
+            raise exceptions.IntervalError(
+                self.interval,
+                expected="equal to 1"
+            )
+        return self.hours
+
+    @property
+    def hours(self) -> "Job":
+        self.unit = utils.TimeUnit.HOURS.value
+        return self
+
+    @property
+    def day(self) -> "Job":
+        if self.interval != 1:
+            raise exceptions.IntervalError(
+                self.interval,
+                expected="equal to 1"
+            )
+        return self.days
+    
+    @property
+    def days(self) -> "Job":
+        self.unit = utils.TimeUnit.DAYS.value
         return self
 
     def _get_label(self, as_slug: bool = False) -> str:
@@ -593,7 +627,9 @@ class Job:
 
 
 def every(interval: int, tag: Optional[str] = None) -> Job:
-    """Create a new job that runs at a specified interval.
+    """Creates a new job instance using the default scheduler. This function 
+    is a convenient way to create jobs without needing to directly interact 
+    with the scheduler.
 
     Args:
         interval (int): The interval in seconds at which the job should run.
@@ -606,5 +642,5 @@ def every(interval: int, tag: Optional[str] = None) -> Job:
 
 
 def run_pending():
-    """Run all jobs that are scheduled to run at the current time."""
+    """Run all jobs created in the default scheduler."""
     default_scheduler.run_pending()
