@@ -1,10 +1,8 @@
-import asyncio
 import datetime
 import functools
 import inspect
 import random
 import uuid
-import time
 from typing import Callable, Optional, Sequence
 from warnings import warn
 from collections import defaultdict
@@ -260,8 +258,10 @@ class Job:
         self.scheduler: Optional[BaseScheduler] = scheduler
         # Unique identifier for the job, used for tracking and management
         self.job_uuid = uuid.uuid4()
-
+        # Indicates whether the job has been cancelled.
+        # If True, the job will not be rescheduled after its next run.
         self.is_cancelled = False
+        # Indicates whether the job has been executed. If True, the job has already run at least once.
         self.was_executed = False
 
     def __repr__(self):
