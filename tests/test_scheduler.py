@@ -1,4 +1,5 @@
 import datetime
+import time
 
 from simplecron.base import BaseScheduler, Job, Cancel
 
@@ -25,13 +26,19 @@ class TestBaseScheduler:
 
     def test_run_pending_jobs(self):
         s = BaseScheduler()
-        s.create_every(1).minutes.do(executor)
+
+        j1 = s.create_every(1).seconds.do(executor)
+
+        time.sleep(1.5)  # Wait for the job to be debugged and executed
+
         s.run_pending()
+
+        assert j1.was_executed is True
 
     def test_run_pending_job_cancels(self):
         s = BaseScheduler()
 
-        s.create_every(1).seconds.do(cancelled_executor)
+        s.create_every(10).seconds.do(cancelled_executor)
         s.run_pending()
 
         assert len(s._jobs) == 0
@@ -43,8 +50,13 @@ class TestBaseScheduler:
         s.run_all()
 
     def test_clear_jobs(self):
-        # Test that clear_jobs() removes all scheduled jobs
-        pass
+        s = BaseScheduler()
+        s.create_every(1).minutes.do(executor)
+        s.create_every(2).minutes.do(executor)
+
+        s.clear()
+
+        assert len(s._jobs) == 0
 
     def test_create_every(self):
         s = BaseScheduler()
@@ -56,17 +68,25 @@ class TestBaseScheduler:
         assert isinstance(job, Job)
         assert len(s._jobs) == 1
 
-    def test_get_next_run_job(self):
-        # Test that get_next_run() returns the next scheduled job
-        pass
+    def test_repr(self):
+        s = BaseScheduler()
+        s.create_every(1).minutes.do(executor)
+
+        repr_str = repr(s)
+        assert isinstance(repr_str, str)
+        assert "BaseScheduler" in repr_str
+        assert "jobs=1" in repr_str
 
     def test_schedule_job(self):
         # Test that schedule_job() correctly schedules a job
         pass
 
     def test_cancel_job(self):
-        # Test that cancel_job() correctly cancels a scheduled job
-        pass
+        s = BaseScheduler()
+        s.create_every(1).minutes.do(cancelled_executor)
+        s._cancel_job(s._jobs[0])
+
+        assert len(s._jobs) == 0
 
     def test_with_event_listener(self):
         # Test that with_event_listener() correctly attaches an event listener to a job
@@ -103,4 +123,18 @@ class TestBaseScheduler:
         assert s.get_next_run() is None
 
     def test_remaining_seconds(self):
-        pass
+        s = BaseScheduler()
+
+        s.create_every(1).minutes.do(executor)
+
+        remaining = s.remaining_seconds()
+
+        assert remaining is not None
+        assert isinstance(remaining, (int, float))
+        assert remaining > 0
+
+        # No next run
+
+        s._jobs.clear()
+
+        assert s.remaining_seconds() is None

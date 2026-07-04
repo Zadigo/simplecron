@@ -91,7 +91,7 @@ class BaseScheduler:
         if not next_run:
             return None
 
-        now = datetime.datetime.now()
+        now = datetime.datetime.now(next_run.tzinfo or datetime.timezone.utc)
         return max(0, (next_run - now).total_seconds())
 
     def with_event_listener(self, event: utils.EventListener, callback: Callable[["Job"], None]):
