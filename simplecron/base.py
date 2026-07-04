@@ -20,9 +20,9 @@ class Cancel:
     This class is used to indicate that a job should be canceled. It can be returned from a job function 
     to signal that the job should not be rescheduled::
 
-        def my_job():
+        def my_job(job: Job):
             if some_condition:
-                return Cancel()  # Signal to cancel the job
+                return Cancel(job)  # Signal to cancel the job
     """
 
     def __init__(self, job: "Job", reason: str = None):
@@ -36,6 +36,9 @@ class Cancel:
 class BaseScheduler:
     def __init__(self):
         self._jobs: list["Job"] = []
+
+    def __repr__(self):
+        return f"<BaseScheduler(jobs={len(self._jobs)})>"
 
     def _run_job(self, job: "Job"):
         result = job.run()
@@ -68,16 +71,28 @@ class BaseScheduler:
         job = Job(interval, self)
         if tag:
             job._tags.add(tag)
-        self._jobs.append(job)
         return job
 
     def get_next_run(self, tag: str = None) -> Optional[datetime.datetime]:
         if not self._jobs:
             return None
 
-        _jobs = self.jobs(tag)
+        if tag is not None:
+            _jobs = self.jobs(tag)
+        else:
+            _jobs = self._jobs
 
         return min(_jobs).next_run if _jobs else None
+
+    def remaining_seconds(self):
+        """Returns the number of seconds until the next scheduled job is due to run."""
+        next_run = self.get_next_run()
+
+        if not next_run:
+            return None
+
+        now = datetime.datetime.now()
+        return max(0, (next_run - now).total_seconds())
 
     def with_event_listener(self, event: utils.EventListener, callback: Callable[["Job"], None]):
         pass
@@ -155,7 +170,7 @@ class Job:
         self.was_executed = False
 
     def __repr__(self):
-        return f"<Job(interval={self.interval}, unit={self.unit}, next_run={self.next_run})>"
+        return f"<Job([{self._get_label(as_slug=True)}], next_run={self.next_run})>"
 
     def __lt__(self, other: "Job"):
         if not isinstance(other, Job):
@@ -348,17 +363,20 @@ class Job:
         """Add tags to the job for categorization and filtering."""
         for tag in tags:
             if not isinstance(tag, str):
-                raise ValueError(f"Tag must be a string, got {type(tag)}")
+                raise TypeError(f"Tag must be a string, got {type(tag)}")
 
         self._tags.update(tags)
         return self
 
     def has_tags(self, *tags: str) -> bool:
+        if not tags:
+            return False
+
         truth_array: list[bool] = []
 
         for tag in tags:
             if not isinstance(tag, str):
-                raise ValueError(f"Tag must be a string, got {type(tag)}")
+                raise TypeError(f"Tag must be a string, got {type(tag)}")
             truth_array.append(tag in self._tags)
 
         return any(truth_array)

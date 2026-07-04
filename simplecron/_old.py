@@ -961,7 +961,7 @@ def something():
     print("I'm working!")
 
 
-# every(10).seconds.do(something)
+every(10).seconds.do(something)
 # every(10).minutes.do(something)
 # every(10).seconds.to(20).do(something)
 # every(10).minutes.to(20).do(something)
@@ -973,7 +973,7 @@ def something():
 # j = every(10).friday.at("08:00").do(something)
 # j = every(1).seconds.at("08:00").do(something)
 # j1 = every(1).hours.do(something)
-j2 = every(1).hours.at("11:57").do(something)
+# j2 = every(1).hours.at("11:57").do(something)
 
 while True:
     run_pending()

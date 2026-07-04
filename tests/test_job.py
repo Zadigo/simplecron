@@ -140,10 +140,20 @@ class TestJob:
 
         assert 'tag1' in self.job_instance._tags
         assert 'tag2' in self.job_instance._tags
-
+        # Add normal tags
         has_tags = self.job_instance.has_tags('tag1')
 
+        # Add noee string tags
+        with pytest.raises(TypeError):
+            self.job_instance.tags(123)
+
         assert has_tags is True, "Job should have tag 'tag1'"
+        # When the user does not pass any tags
+        assert self.job_instance.has_tags() is False
+
+        # When the user passes a tag that is not a string
+        with pytest.raises(TypeError):
+            self.job_instance.has_tags(123)
 
     def test_get_label(self):
         cases = [
