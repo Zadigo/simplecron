@@ -10,7 +10,7 @@ from collections import defaultdict
 from functools import total_ordering
 import pytz
 from simplecron import exceptions
-from simplecron.typings import TypeJobFunction, TypeJobReturn
+from simplecron.typings import TypeEventListenerCallback, TypeJobFunction, TypeJobReturn
 from simplecron import utils
 
 
@@ -145,7 +145,7 @@ class BaseScheduler:
         now = datetime.datetime.now(next_run.tzinfo or datetime.timezone.utc)
         return max(0, (next_run - now).total_seconds())
 
-    def with_event_listener(self, event: utils.EventListenerEnum, callback: Callable[[Sequence["Job"]], None]):
+    def with_event_listener(self, event: utils.EventListenerEnum, callback: TypeEventListenerCallback):
         """Attaches a callback function to a specific event listener. There are three types of event listeners available:
 
         - `BEFORE`: Triggered before each job is run.
@@ -172,6 +172,22 @@ class BaseScheduler:
         self.event_listeners[event.value].append(
             Listener(event.value, callback)
         )
+
+    def before_all_events(self, callbacks: Sequence[TypeEventListenerCallback]):
+        """Attach multiple callback functions to the BEFORE_ALL event listener."""
+        for callback in callbacks:
+            self.with_event_listener(
+                utils.EventListenerEnum.BEFORE_ALL, callback)
+
+    def before_events(self, callbacks: Sequence[TypeEventListenerCallback]):
+        """Attach multiple callback functions to the BEFORE event listener."""
+        for callback in callbacks:
+            self.with_event_listener(utils.EventListenerEnum.BEFORE, callback)
+
+    def after_events(self, callbacks: Sequence[TypeEventListenerCallback]):
+        """Attach multiple callback functions to the AFTER event listener."""
+        for callback in callbacks:
+            self.with_event_listener(utils.EventListenerEnum.AFTER, callback)
 
     def with_context(self, context: dict):
         pass

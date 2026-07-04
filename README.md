@@ -53,7 +53,7 @@ def main():
 if __name__ == "__main__":
 	main()
 ```
-
+<!-- 
 The same code can be achieved using the `Schedulers` class with the `start_blocking` method, which allows you to run multiple schedulers consecutively in a blocking manner.
 
 ```Python
@@ -78,7 +78,6 @@ def main():
 if __name__ == "__main__":
 	main()
 ```
-
 
 ### Concurrent schedulers
 
@@ -105,8 +104,39 @@ async def main():
 
 if __name__ == "__main__":
 	asyncio.run(main())
+``` -->
+
+## Event Listeners
+
+You can attach event listeners to a scheduler to listen for specific events. There are three main listeners:
+
+* `before` - Triggered before a job is executed.
+* `after` - Triggered after a job is executed.
+* `before_all` - Triggered before all jobs are executed.
+
+```python
+from simplecron.base import default_scheduler
+from simplecron.utils import EventListenerEnum
+
+default_scheduler.event_listener(EventListenerEnum.BEFORE_ALL, lambda scheduler: print("Before all jobs"))
 ```
 
-## Using  memory
+The same can be achieved using the shortcut method `before_all_events`, `after_events`, and `before_events`:
 
-The ressults of the jobs can be memorized in a local file, a database (sqlite) or in Redis.
+```python
+from simplecron.base import default_scheduler
+
+default_scheduler.before_all_events(lambda scheduler: print("Before all jobs"))
+default_scheduler.before_events(lambda job: print("Before job:", job))
+default_scheduler.after_events(lambda job: print("After job:", job))
+```
+
+<!-- You can also attach event listeners to a specific jobs matching a certain set of tags or criteria. This allows you to have more granular control over which jobs trigger the event listeners.:
+
+```python
+from simplecron.base import default_scheduler
+from simplecron.utils import EventListenerEnum
+
+def before_all_jobs(jobs):
+	print("Before all jobs:", jobs)
+``` -->
