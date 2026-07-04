@@ -1,5 +1,5 @@
 import pytest
-from simplecron.base import Job
+from simplecron.base import Job, BaseScheduler
 from simplecron.utils import TimeUnit
 from simplecron import exceptions
 import datetime
@@ -264,3 +264,12 @@ class TestJobExceptions:
         with pytest.raises(ValueError):
             self.job_instance.unit = None
             self.job_instance._schedule_next_run()
+
+
+def test_serialization():
+    s = BaseScheduler()
+    j = s.create_every(10).minutes.do(lambda: print("Hello, World!"))
+    data = j.destructure()
+
+    assert isinstance(data, dict), "Destructured job should be a dictionary"
+    assert data['interval'] == j.interval, "Interval should be preserved in destructured data"

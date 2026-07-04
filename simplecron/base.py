@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import functools
+import inspect
 import random
 import uuid
 import time
@@ -8,6 +9,7 @@ from typing import Callable, Optional, Sequence
 from warnings import warn
 from collections import defaultdict
 from functools import total_ordering
+from asgiref.sync import async_to_sync
 import pytz
 from simplecron import exceptions
 from simplecron.typings import TypeEventListenerCallback, TypeJobFunction, TypeJobReturn
@@ -429,6 +431,18 @@ class Job:
         self.start_day = 'sunday'
         return self.weeks
 
+    @classmethod
+    def build_from_dict(cls, data: dict) -> "Job":
+        """Reconstruct a Job instance from a dictionary representation.
+
+        Args:
+            data (dict): A dictionary containing the job's attributes.
+        """
+        interval = data.pop('interval')
+        job = cls(interval)
+        job.__dict__.update(data)
+        return job
+
     def _get_label(self, as_slug: bool = False) -> str:
         """Generate a human-readable label for the job, describing its schedule."""
         if self.at_time is not None:
@@ -573,6 +587,22 @@ class Job:
             restore_time=self.at_time is not None
         )
 
+    def destructure(self) -> dict:
+        """Destructure the job instance into a 
+        dictionary representation that can be easily serialized."""
+        values: dict[str, str] = {}
+
+        for key, value in self.__dict__.items():
+            if key.startswith("__"):
+                continue
+
+            if isinstance(value, (datetime.datetime, datetime.time)):
+                values[key] = value.isoformat()
+                continue
+
+            values[key] = value
+        return values
+
     def tags(self, *tags: str) -> "Job":
         """Add tags to the job for categorization and filtering."""
         for tag in tags:
@@ -618,7 +648,6 @@ class Job:
             while True:
                 simplecron.run_pending()
         """
-
         self._job_func = functools.partial(job_func, *args, **kwargs)
         functools.update_wrapper(self._job_func, job_func)
         self._schedule_next_run()
@@ -705,7 +734,10 @@ class Job:
             raise ValueError(
                 "No job function assigned. Use the 'do' method to assign a function.")
 
-        result = self._job_func(self)
+        if inspect.iscoroutinefunction(self._job_func):
+            result = async_to_sync(self._job_func)(self)
+        else:
+            result = self._job_func(self)
 
         self.last_run = datetime.datetime.now()
         self._schedule_next_run()

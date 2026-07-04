@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Callable, Coroutine, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Sequence
 
 
 if TYPE_CHECKING:
@@ -7,11 +7,11 @@ if TYPE_CHECKING:
 
 type TypeJob = "Job"
 
-type TypeJobReturn = Cancel | None
+type TypeJobReturn = "Cancel" | None
 
 
 # | Coroutine["Job", None, None]
-type TypeJobFunction = Callable[["Job"], TypeJobReturn]
+type TypeJobFunction[T = "Job", R = TypeJobReturn] = Callable[[T], R] | Callable[[T], Coroutine[Any, Any, R]]
 
 type TypeBaseScheduler = "BaseScheduler"
 

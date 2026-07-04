@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import time
 
@@ -5,6 +6,13 @@ import pytest
 
 from simplecron import exceptions, utils
 from simplecron.base import BaseScheduler, Job, Cancel
+
+
+async def async_executor(job: Job):
+    """An async executor function that runs the job's function."""
+    print(f"Executing job: {job._get_label()}")
+    await asyncio.sleep(0.1)  # Simulate some async work
+    return None
 
 
 def executor(job: Job):
@@ -193,3 +201,16 @@ class TestBaseScheduler:
 
         # Correct calling order: every -> unit -> do
         s.create_every(1).minutes.do(executor)
+
+    def test_async_job_execution(self):
+        s = BaseScheduler()
+
+        # Create an async job
+        s.create_every(1).seconds.do(async_executor)
+        time.sleep(1.5)  # Wait for the job to be debugged and executed
+
+        # Run pending jobs
+        s.run_pending()
+
+        # Check if the job was executed
+        assert s._jobs[0].was_executed is True
