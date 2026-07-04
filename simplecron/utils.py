@@ -16,10 +16,13 @@ class TimeUnit(enum.Enum):
 TIME_UNITS = list(map(lambda unit: unit.value, TimeUnit))
 
 
-class EventListener(enum.Enum):
+class EventListenerEnum(enum.Enum):
     BEFORE_ALL = "before_all"
     BEFORE = "before"
     AFTER = "after"
+
+
+EVENT_LISTENERS = list(map(lambda listener: listener.value, EventListenerEnum))
 
 
 def weekdays(day: str) -> int:

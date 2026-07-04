@@ -1,6 +1,7 @@
 import datetime
 import time
 
+from simplecron import utils
 from simplecron.base import BaseScheduler, Job, Cancel
 
 
@@ -13,6 +14,21 @@ def cancelled_executor(job: Job):
     """An executor function that cancels the job."""
     print(f"Cancelling job: {job._get_label()}")
     return Cancel(job, reason="Cancelled by executor")
+
+
+def simple_before_listener(job: Job):
+    """A simple before listener that prints a message before the job runs."""
+    print(f"Before running job: {job._get_label()}")
+
+
+def simple_after_listener(job: Job):
+    """A simple after listener that prints a message after the job runs."""
+    print(f"After running job: {job._get_label()}")
+
+
+def simple_before_all_listener(jobs: list[Job]):
+    """A simple before all listener that prints a message before all jobs run."""
+    print(f"Before running all jobs: {[job._get_label() for job in jobs]}")
 
 
 class TestBaseScheduler:
@@ -28,7 +44,6 @@ class TestBaseScheduler:
         s = BaseScheduler()
 
         j1 = s.create_every(1).seconds.do(executor)
-
         time.sleep(1.5)  # Wait for the job to be debugged and executed
 
         s.run_pending()
@@ -38,7 +53,8 @@ class TestBaseScheduler:
     def test_run_pending_job_cancels(self):
         s = BaseScheduler()
 
-        s.create_every(10).seconds.do(cancelled_executor)
+        s.create_every(1).seconds.do(cancelled_executor)
+        time.sleep(1.5)  # Wait for the job to be debugged and executed
         s.run_pending()
 
         assert len(s._jobs) == 0
@@ -76,10 +92,6 @@ class TestBaseScheduler:
         assert isinstance(repr_str, str)
         assert "BaseScheduler" in repr_str
         assert "jobs=1" in repr_str
-
-    def test_schedule_job(self):
-        # Test that schedule_job() correctly schedules a job
-        pass
 
     def test_cancel_job(self):
         s = BaseScheduler()
@@ -138,3 +150,31 @@ class TestBaseScheduler:
         s._jobs.clear()
 
         assert s.remaining_seconds() is None
+
+    def test_run_all_jobs_with_listeners(self):
+        s = BaseScheduler()
+
+        s.with_event_listener(
+            utils.EventListenerEnum.BEFORE,
+            simple_before_listener
+
+        )
+        s.with_event_listener(
+            utils.EventListenerEnum.AFTER,
+            simple_after_listener
+        )
+        s.with_event_listener(
+            utils.EventListenerEnum.BEFORE_ALL,
+            simple_before_all_listener
+        )
+
+        # Create a job with an event listener
+        s.create_every(1).seconds.do(executor)
+        time.sleep(1.5)  # Wait for the job to be debugged and was_executed
+
+        # Run pending jobs
+        s.run_pending()
+
+        for _, listeners in s.event_listeners.items():
+            for listener in listeners:
+                assert listener.counter > 0

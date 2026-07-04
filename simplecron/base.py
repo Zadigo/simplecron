@@ -4,7 +4,7 @@ import functools
 import random
 import uuid
 import time
-from typing import Callable, Optional
+from typing import Callable, Optional, Sequence
 from warnings import warn
 from collections import defaultdict
 from functools import total_ordering
@@ -33,17 +33,63 @@ class Cancel:
             self.job.is_cancelled = True
 
 
+class Listener:
+    """A class representing an event listener for jobs. It wraps
+    a callback function that is triggered on specific job events.
+    """
+
+    def __init__(self, event: str, callback: Callable[["Job" | Sequence["Job"]], None]):
+        self.event = event
+        self.callback = callback
+        self.counter: int = 0
+
+    def __repr__(self):
+        return f"<Listener(event={self.event}, counter={self.counter})>"
+
+    def __eq__(self, other: "Listener"):
+        if not isinstance(other, Listener):
+            return NotImplemented
+        return self.event == other.event and self.callback == other.callback
+
+    def resolve(self, jobs: Sequence["Job"]):
+        try:
+            if self.event == utils.EventListenerEnum.BEFORE_ALL.value:
+                self.callback(jobs)
+            else:
+                for job in jobs:
+                    self.callback(job)
+        except Exception as e:
+            # Catch any exceptions created by the user coding mistakes
+            # without breaking the the main loop
+            print(f"Error in listener for event '{self.event}': {e}")
+
+        self.counter += 1
+
+
 class BaseScheduler:
     def __init__(self):
         self._jobs: list["Job"] = []
+        self.event_listeners = defaultdict(list[Listener])
 
     def __repr__(self):
         return f"<BaseScheduler(jobs={len(self._jobs)})>"
 
+    def _resolve_listeners(self, jobs: Sequence["Job"], *listeners: Listener):
+        for listener in listeners:
+            listener.resolve(jobs)
+
     def _run_job(self, job: "Job"):
+        # Resolve event that occurs before the job is run
+        listeners = self.event_listeners[utils.EventListenerEnum.BEFORE.value]
+        self._resolve_listeners([job], *listeners)
+
         result = job.run()
         if isinstance(result, Cancel):
             self._cancel_job(job)
+
+        # Resolve event that occurs after the job is run
+        listeners = self.event_listeners[utils.EventListenerEnum.AFTER.value]
+        self._resolve_listeners([job], *listeners)
 
     def _cancel_job(self, job: "Job"):
         if job in self._jobs:
@@ -57,6 +103,11 @@ class BaseScheduler:
     def run_pending(self):
         """Run all jobs that are scheduled to run at the current time."""
         _jobs = sorted(filter(lambda job: job.should_run, self._jobs))
+
+        # Resolve listerners before all jobs are run
+        listeners = self.event_listeners[utils.EventListenerEnum.BEFORE_ALL.value]
+        self._resolve_listeners(_jobs, *listeners)
+
         for job in _jobs:
             self._run_job(job)
 
@@ -94,8 +145,33 @@ class BaseScheduler:
         now = datetime.datetime.now(next_run.tzinfo or datetime.timezone.utc)
         return max(0, (next_run - now).total_seconds())
 
-    def with_event_listener(self, event: utils.EventListener, callback: Callable[["Job"], None]):
-        pass
+    def with_event_listener(self, event: utils.EventListenerEnum, callback: Callable[[Sequence["Job"]], None]):
+        """Attaches a callback function to a specific event listener. There are three types of event listeners available:
+
+        - `BEFORE`: Triggered before each job is run.
+        - `AFTER`: Triggered after each job is run.
+        - `BEFORE_ALL`: Triggered before all jobs are run in a batch.
+
+        For example, to attach a callback that logs information before each job runs, you can do the following::
+
+            def log_before_jobs(jobs):
+                for job in jobs:
+                    print(f"About to run job: {job}")
+
+            default_scheduler.with_event_listener(utils.EventListenerEnum.BEFORE, log_before_jobs)
+
+        Args:
+            event (utils.EventListenerEnum): The event listener type to attach the callback to.
+            callback (Callable[[Sequence["Job"]], None]): The callback function to be executed when the event is triggered. It receives a sequence of jobs as its argument.
+        """
+        if event.value not in utils.EVENT_LISTENERS:
+            raise ValueError(
+                f"Invalid event listener: {event}. Must be one of {list(utils.EVENT_LISTENERS)}."
+            )
+
+        self.event_listeners[event.value].append(
+            Listener(event.value, callback)
+        )
 
     def with_context(self, context: dict):
         pass

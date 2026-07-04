@@ -1,21 +1,21 @@
 # Simple Cron
 
-Simplecron is a Python module that creates a cron scheduler in Pyrhon
+Simplecron is a simple and lightweight Python library for scheduling tasks using cron-like syntax. It allows you to define jobs that run at specific intervals or times, making it easy to automate repetitive tasks in your applications.
 
-## Create a schedule
+## Creating a schedule
 
-### Using the default scheduler
+### Default scheduler
 
-In simple situations, you can use the default scheduler to run a simple cron over a period of time:
+In simple situations, you can use the default scheduler to schedule your jobs. The default scheduler runs in the main thread and is suitable for simple use cases.
 
 ```Python
 from simplecron import base
 
-def simple_function(job: base.Job, *args, **kwargs):
+def callback(job: base.Job, *args, **kwargs):
     print("Hello, World!", job)
 
 
-base.every(1).second.do(some_func)
+base.every(1).second.do(callback)
 
 
 while True:
@@ -23,24 +23,88 @@ while True:
     time.sleep(1)
 ```
 
-> This is a blocking function, in other words it blocks the
+By calling `every`, a new job is created. `schedule` attaches the unit of time to the job and finally `do` attaches the callback function.
 
-## Using multiple schedulers
+> [!NOTE]
+> This is a blocking function, in other words, it will block the main thread and will not allow other code to run while it is executing.
 
-```Python
-from simplecron import base
+### Custom scheduler
 
-async def main():
-	s1 = base.BaseScheduler()
-	s2 = base.BaseScheduler()
+You can also create your own scheduler by instantiating the `BaseScheduler` class. This can allow you to have multiple schedulers running concurrently, each with its own set of jobs.
 
-	synchronizer = base.synchronize(s1, s2)
+```python
+from simplecron.base import BaseScheduler
 
-  	await synchronizer
+s1 = BaseScheduler()
+s2 = BaseScheduler()
 
+# Adds a job to the first scheduler that runs every second
+s1.every(1).second.do(lambda job: print("Scheduler 1:", job))
+
+# Adds a job to the second scheduler that runs every 2 seconds
+s2.every(2).seconds.do(lambda job: print("Scheduler 2:", job))
+
+def main():
+	while True:
+		s1.run_pending_jobs()
+		s2.run_pending_jobs()
+		time.sleep(1)
 
 if __name__ == "__main__":
-	aysncio.run(main())
+	main()
+```
+
+The same code can be achieved using the `Schedulers` class with the `start_blocking` method, which allows you to run multiple schedulers consecutively in a blocking manner.
+
+```Python
+import asyncio
+from simplecron.base import BaseScheduler, Job
+from simplecron.runners import Schedulers
+
+synchronizer = Schedulers()
+
+def callback(job: Job, *args, **kwargs):
+	print("Hello, World!", job)
+
+def main():
+	s1 = BaseScheduler()
+	s2 = BaseScheduler()
+
+	synchronizer.add_scheduler(s1, "seconds", 1, callback)
+	synchronizer.add_scheduler(s2, "seconds", 2, callback)
+
+	synchronizer.start_blocking()
+
+if __name__ == "__main__":
+	main()
+```
+
+
+### Concurrent schedulers
+
+To run multiple schedulers concurrently, you can use the `asyncio` library. This allows you to run multiple schedulers in an asynchronous manner, enabling better performance and responsiveness.
+
+```Python
+import asyncio
+from simplecron.base import BaseScheduler, Job
+from simplecron.runners import Schedulers
+
+synchronizer = Schedulers()
+
+def callback(job: Job, *args, **kwargs):
+	print("Hello, World!", job)
+
+async def main():
+	s1 = BaseScheduler()
+	s2 = BaseScheduler()
+
+	synchronizer.add_scheduler(s1, "seconds", 1, callback)
+	synchronizer.add_scheduler(s2, "seconds", 2, callback)
+
+	await synchronizer.async_blocking()
+
+if __name__ == "__main__":
+	asyncio.run(main())
 ```
 
 ## Using  memory
