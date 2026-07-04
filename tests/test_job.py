@@ -136,10 +136,14 @@ class TestJob:
             assert self.job_instance.at_time == item['value']
 
     def test_add_tags(self):
-        # Test that add_tags() correctly adds tags to the job
         self.job_instance.tags('tag1', 'tag2')
+
         assert 'tag1' in self.job_instance._tags
         assert 'tag2' in self.job_instance._tags
+
+        has_tags = self.job_instance.has_tags('tag1')
+
+        assert has_tags is True, "Job should have tag 'tag1'"
 
     def test_get_label(self):
         cases = [
@@ -187,6 +191,20 @@ class TestJob:
 
             label = self.job_instance._get_label()
             assert label == item['expected'], item['note']
+
+    def test_job_in_set(self):
+        job1 = Job(interval=10)
+        job2 = Job(interval=10)
+
+        job_set = {job1, job2}
+
+        assert job1 == job1, "A job should be equal to itself"
+        assert len(
+            job_set) == 2, "Both jobs should be in the set since they have different UUIDs"
+
+        job_set.remove(job1)
+
+        assert job1 not in job_set, "job1 should be removed from the set"
 
 
 class TestJobExceptions:

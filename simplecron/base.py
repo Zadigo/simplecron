@@ -7,7 +7,7 @@ import time
 from typing import Callable, Optional
 from warnings import warn
 from collections import defaultdict
-
+from functools import total_ordering
 import pytz
 from simplecron import exceptions
 from simplecron.typings import TypeJobFunction, TypeJobReturn
@@ -46,9 +46,9 @@ class BaseScheduler:
         if job in self._jobs:
             self._jobs.remove(job)
 
-    def jobs(self, tag: str = None) -> list["Job"]:
-        if tag is not None:
-            return [job for job in self._jobs if tag in job._tags]
+    def jobs(self, *tags: str) -> list["Job"]:
+        if tags:
+            return list(filter(lambda job: job.has_tags(*tags), self._jobs))
         return self._jobs
 
     def run_pending(self):
@@ -71,8 +71,13 @@ class BaseScheduler:
         self._jobs.append(job)
         return job
 
-    def get_next_run(self, tag: str = None) -> "Job":
-        pass
+    def get_next_run(self, tag: str = None) -> Optional[datetime.datetime]:
+        if not self._jobs:
+            return None
+
+        _jobs = self.jobs(tag)
+
+        return min(_jobs).next_run if _jobs else None
 
     def with_event_listener(self, event: utils.EventListener, callback: Callable[["Job"], None]):
         pass
@@ -87,6 +92,7 @@ class BaseScheduler:
 default_scheduler = BaseScheduler()
 
 
+@total_ordering
 class Job:
     """A periodic job that can be scheduled to run at specific intervals.
 
@@ -156,8 +162,14 @@ class Job:
             return NotImplemented
         return self.next_run < other.next_run
 
+    def __eq__(self, other: "Job"):
+        if not isinstance(other, Job):
+            return NotImplemented
+        return self.next_run == other.next_run
+
     def __hash__(self):
-        return hash((self.job_uuid, self._get_label(as_slug=True)))
+        tags = tuple(sorted(self._tags))
+        return hash((self.job_uuid, self._get_label(as_slug=True), *tags))
 
     @property
     def should_run(self) -> bool:
@@ -340,6 +352,16 @@ class Job:
 
         self._tags.update(tags)
         return self
+
+    def has_tags(self, *tags: str) -> bool:
+        truth_array: list[bool] = []
+
+        for tag in tags:
+            if not isinstance(tag, str):
+                raise ValueError(f"Tag must be a string, got {type(tag)}")
+            truth_array.append(tag in self._tags)
+
+        return any(truth_array)
 
     def do(self, job_func: TypeJobFunction, *args, **kwargs) -> "Job":
         """Assign a function to be executed when the job runs
