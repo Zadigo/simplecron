@@ -539,15 +539,19 @@ class Job:
         second: Union[str, int]
 
         if len(time_values) == 3:
+            # x:x:x
             hour, minute, second = time_values
         elif len(time_values) == 2 and self.unit == "minutes":
+            # 0:0:x
             hour = 0
             minute = 0
             _, second = time_values
         elif len(time_values) == 2 and self.unit == "hours" and len(time_values[0]):
+            # 0:x:x
             hour = 0
             minute, second = time_values
         else:
+            # x:x:0
             hour, minute = time_values
             second = 0
 
