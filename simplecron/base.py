@@ -560,7 +560,6 @@ class Job:
         # Get the current time in the specified timezone,
         # or UTC if no timezone is set
         current_time = datetime.datetime.now(self.at_timezone)
-
         _next_run = current_time
 
         if self.start_day is not None:
@@ -668,23 +667,23 @@ class Job:
             import datetime
             import simplecron
 
-            simplecron.every(1).days.at(datetime.time(14, 30)).do(my_job_function)
+            simplecron.every(1).days.at(datetime.time(hour=14, minute=30)).do(my_job_function)
 
-        To schedule a job to run every day at `14:30` in a specific timezone, you can use the following code::
+        To schedule a job to run every hour when the minute is 15 e.g. 10:15, 11:15, 12:15::
 
             import datetime
             import pytz
             import simplecron
 
             timezone = pytz.timezone('America/New_York')
-            simplecron.every(1).days.at(datetime.time(14, 30), timezone=timezone).do(my_job_function)
+            simplecron.every(1).days.at(datetime.time(minute=30), timezone=timezone).do(my_job_function)
 
-        To schedule a job to run every hour and specifically at `01:30`::
+        To schedule a job to runs every minute when the second is 30 e.g. 10:15:30, 10:16:30, 10:17:30::
 
             import datetime
             import simplecron
 
-            simplecron.every(1).hours.at(datetime.time(1, 30)).do(my_job_function)
+            simplecron.every(1).hours.at(datetime.time(second=30)).do(my_job_function)
 
         Using `hours` and `minutes` units will fixate the time to the specified hour and minute. For instance, in the above
         example, the job will run every hour and ...
@@ -711,20 +710,26 @@ class Job:
         minute: Optional[int] = None
         second: Optional[int] = None
 
+        # Every minute when the second is X.
+        # E.g. 10:15:30, 10:16:30, 10:17:30
+        if self.unit == utils.TimeUnit.MINUTES.value:
+            hour = 0
+            minute = 0
+            second = using.second
+
+        # Every day when the hour is X and the minute is Y.
+        # E.g. Monday at 10:15:00, Tuesday at 10:15:00, Wednesday at 10:15:00
         if self.unit == utils.TimeUnit.DAYS.value or self.start_day:
             hour = using.hour
             minute = using.minute
             second = using.second
 
+        # Every hour when the minute is X.
+        # E.g. 10:15:00, 11:15:00, 12:15:00
         if self.unit == utils.TimeUnit.HOURS.value:
             hour = 0
             minute = 0
             second = using.second
-
-        if self.unit == utils.TimeUnit.MINUTES.value:
-            hour = using.hour
-            minute = using.minute
-            second = 0
 
         self.at_time = datetime.time(hour=hour, minute=minute, second=second)
         return self
