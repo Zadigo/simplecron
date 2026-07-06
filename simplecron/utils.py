@@ -1,5 +1,5 @@
 import datetime
-
+import logging
 import enum
 
 
@@ -59,3 +59,28 @@ def move_to_next_weekday(dt: datetime.datetime, target_weekday: str) -> datetime
     if days_ahead <= 0:  # Target day already passed this week
         days_ahead += 7
     return dt + datetime.timedelta(days=days_ahead)
+
+
+def get_logger() -> "logging.Logger":
+    """Get the logger instance for the simplecron module."""
+    # logger = logging.getLogger("simplecron")
+    # if not logger.handlers:
+    #     # Configure the logger if it hasn't been configured yet
+    #     handler = logging.StreamHandler()
+    #     formatter = logging.Formatter(
+    #         "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    #     )
+    #     handler.setFormatter(formatter)
+    #     logger.addHandler(handler)
+    #     logger.setLevel(logging.INFO)
+    # return logger
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        handlers=[logging.StreamHandler()],
+        style="%",
+    )
+
+    return logging.getLogger("simplecron")

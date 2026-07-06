@@ -2,12 +2,18 @@ import asyncio
 import time
 from typing import Any, NoReturn
 from simplecron.typings import TypeBaseScheduler, TypeJob, TypeJobFunction
-from simplecron.base import TimeUnit
+from simplecron.utils import TimeUnit
 import threading
 from asgiref.sync import sync_to_async
 
 
 class Context:
+    queue = asyncio.Queue()
+    lock = asyncio.Lock()
+
+    def __init__(self):
+        self.is_done: bool = False
+
     def add(self, key: str, value: Any):
         setattr(self, key, value)
 
@@ -19,11 +25,15 @@ class Context:
         clean_values = filter(lambda x: not x.startswith("__"), dir(self))
         return [(key, getattr(self, key)) for key in clean_values if not callable(getattr(self, key))]
 
+    def done(self):
+        self.is_done = True
+
 
 class Schedulers:
     """A class to manage multiple schedulers and run them in a blocking manner."""
 
     schedulers: list[TypeBaseScheduler] = []
+    lock = threading.Semaphore(3)
 
     def add(self, scheduler: TypeBaseScheduler, unit: TimeUnit, interval: int, job_func: TypeJobFunction, *args, **kwargs) -> TypeJob:
         new_job = scheduler.create_every(interval=interval)
@@ -38,12 +48,15 @@ class Schedulers:
         def loop():
             while True:
                 for scheduler in self.schedulers:
-                    scheduler.run_pending()
+                    with self.lock:
+                        scheduler.run_pending()
                 time.sleep(1)
 
         thread = threading.Thread(target=loop)
+        
         thread.name = "RunningSchedulersThread"
         thread.daemon = True
+
         thread.start()
         thread.join()
 
@@ -60,6 +73,7 @@ class Schedulers:
                             thread_sensitive=True
                         )
                         task = tg.create_task(async_run_pending())
+
                         # task.set_name(f"Scheduler-{scheduler.id}-Task")
                         # task.add_done_callback(
                         #     lambda t: print(

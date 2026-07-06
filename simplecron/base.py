@@ -13,6 +13,8 @@ from simplecron import exceptions
 from simplecron.typings import TypeEventListenerCallback, TypeJobFunction, TypeJobReturn
 from simplecron import utils
 
+logger = utils.get_logger()
+
 
 class Cancel:
     """A class representing a cancellation signal for jobs.
@@ -70,6 +72,7 @@ class BaseScheduler:
     def __init__(self):
         self._jobs: list["Job"] = []
         self.event_listeners = defaultdict(list[Listener])
+        logger.info("Starting Simplecron scheduler...")
 
     def __repr__(self):
         return f"<BaseScheduler(jobs={len(self._jobs)})>"
@@ -84,6 +87,7 @@ class BaseScheduler:
         self._resolve_listeners([job], *listeners)
 
         result = job.run()
+        logger.info(f"Job executed: {job}")
         if isinstance(result, Cancel):
             self._cancel_job(job)
 
@@ -94,6 +98,7 @@ class BaseScheduler:
     def _cancel_job(self, job: "Job"):
         if job in self._jobs:
             self._jobs.remove(job)
+            logger.warning(f"Job cancelled: {job}. Reason: {getattr(job, 'reason', 'No reason provided')}")
 
     def jobs(self, *tags: str) -> list["Job"]:
         if tags:

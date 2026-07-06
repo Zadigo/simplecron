@@ -2,10 +2,12 @@ import time
 
 import pytz
 from simplecron import base, utils
+from simplecron.base import Cancel
 
 
 def some_func(job: base.Job, *args, **kwargs):
     print("* Last:", str(job.last_run), "Next:", str(job.next_run))
+    return Cancel(job, reason="Job completed successfully.")
 
 
 def after_func(job: base.Job, *args, **kwargs):
