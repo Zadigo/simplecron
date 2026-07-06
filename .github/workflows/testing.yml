@@ -41,7 +41,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install uvicorn
-        run: pip install uvicorn[standard]
+        run: python -m pip install --upgrade pip uv
       - name: Install dependencies
         run: |
           uv sync
