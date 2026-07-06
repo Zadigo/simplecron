@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING, Any, Callable, Coroutine, Sequence
+import datetime
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Sequence, Union
 
 
 if TYPE_CHECKING:
@@ -16,3 +17,5 @@ type TypeJobFunction[T = "Job", R = TypeJobReturn] = Callable[[T], R] | Callable
 type TypeBaseScheduler = "BaseScheduler"
 
 type TypeEventListenerCallback = Callable[[Sequence["Job"]], None]
+
+type TypeDatetimes = Union[datetime.datetime, datetime.time, datetime.timedelta]

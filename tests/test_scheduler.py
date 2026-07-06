@@ -3,6 +3,7 @@ import datetime
 import time
 
 import pytest
+import pytz
 
 from simplecron import exceptions, utils
 from simplecron.base import BaseScheduler, Job, Cancel
@@ -214,3 +215,29 @@ class TestBaseScheduler:
 
         # Check if the job was executed
         assert s._jobs[0].was_executed is True
+
+
+
+
+class TestUntil:
+    @pytest.mark.parametrize("limit_type", ["datetime", "time", "timedelta"])
+    def test_until_with_various_types(self, limit_type):
+        current_time = datetime.datetime.now(tz=pytz.UTC)
+
+        s = BaseScheduler()
+        if limit_type == "datetime":
+            future_time = current_time + datetime.timedelta(seconds=5)
+            job = s.create_every(1).seconds.do(executor).until(future_time)
+
+            assert job.cancel_after == future_time
+        elif limit_type == "time":
+            future_time = (current_time + datetime.timedelta(seconds=5)).time()
+            job = s.create_every(1).seconds.do(executor).until(future_time)
+            
+            assert job.cancel_after.time() == future_time
+        elif limit_type == "timedelta":
+            future_timedelta = datetime.timedelta(seconds=5)
+            job = s.create_every(1).seconds.do(executor).until(future_timedelta)
+            expected_cancel_after = current_time + future_timedelta
+            
+            assert abs((job.cancel_after - expected_cancel_after).total_seconds()) < 1

@@ -3,14 +3,14 @@ import functools
 import inspect
 import random
 import uuid
-from typing import Callable, Optional, Sequence
+from typing import Callable, Optional, Sequence, Union
 from warnings import warn
 from collections import defaultdict
 from functools import total_ordering
 from asgiref.sync import async_to_sync
 import pytz
 from simplecron import exceptions
-from simplecron.typings import TypeEventListenerCallback, TypeJobFunction, TypeJobReturn
+from simplecron.typings import TypeDatetimes, TypeEventListenerCallback, TypeJobFunction, TypeJobReturn
 from simplecron import utils
 
 logger = utils.get_logger()
@@ -285,6 +285,11 @@ class Job:
     def __hash__(self):
         tags = tuple(sorted(self._tags))
         return hash((self.job_uuid, self._get_label(as_slug=True), *tags))
+    
+    @property
+    def get_current_time(self) -> datetime.datetime:
+        """Get the current time in the job's timezone or UTC if no timezone is set."""
+        return datetime.datetime.now(self.at_timezone or datetime.timezone.utc)
 
     @property
     def should_run(self) -> bool:
@@ -447,6 +452,17 @@ class Job:
         job = cls(interval)
         job.__dict__.update(data)
         return job
+    
+    def _must_cancel(self) -> bool:
+        """Determine if the job should be cancelled based on its 'cancel_after' attribute.
+
+        Returns:
+            bool: True if the job should be cancelled, False otherwise.
+        """
+        if self.cancel_after is None:
+            return False
+
+        return self.get_current_time >= self.cancel_after
 
     def _get_label(self, as_slug: bool = False) -> str:
         """Generate a human-readable label for the job, describing its schedule."""
@@ -738,19 +754,52 @@ class Job:
 
         self.at_time = datetime.time(hour=hour, minute=minute, second=second)
         return self
+    
+    def until(self, limit: TypeDatetimes) -> "Job":
+        """Set a limit for the job's execution, after which it will be cancelled."""
+        if isinstance(limit, datetime.datetime):
+            self.cancel_after = limit
+
+        if isinstance(limit, datetime.time):
+            self.cancel_after = datetime.datetime.combine(
+                self.get_current_time.date(),
+                limit,
+                tzinfo=self.at_timezone
+            )
+
+        if isinstance(limit, datetime.timedelta):
+            self.cancel_after = self.get_current_time + limit
+
+        if self.cancel_after is None:
+            raise ValueError(
+                f"Invalid limit type: {type(limit)}. Must be one of datetime.datetime, datetime.time, or datetime.timedelta."
+            )
+        
+        if self.cancel_after <= self.get_current_time:
+            raise ValueError(
+                f"Invalid limit: {self.cancel_after}. Must be in the future."
+            )
+        
+        return self
 
     def run(self) -> TypeJobReturn:
         if self._job_func is None:
             raise ValueError(
                 "No job function assigned. Use the 'do' method to assign a function.")
+        
+        if self._must_cancel():
+            return Cancel(self, reason=f"Job cancelled after {self.cancel_after.isoformat()}")
 
         if inspect.iscoroutinefunction(self._job_func):
             result = async_to_sync(self._job_func)(self)
         else:
             result = self._job_func(self)
 
-        self.last_run = datetime.datetime.now()
+        self.last_run = self.get_current_time
         self._schedule_next_run()
+
+        if self._must_cancel():
+            return Cancel(self, reason=f"Job cancelled after {self.cancel_after.isoformat()}")
 
         self.was_executed = True
         return result
