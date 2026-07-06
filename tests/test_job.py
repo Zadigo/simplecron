@@ -18,67 +18,88 @@ def test_move_to_at_time(interval_time):
 
     cases = [
         {
-            'value': datetime.datetime(2024, 6, 1, 12, 0, tzinfo=datetime.timezone.utc),
-            'at_time': datetime.time(15, 30),
-            'expected': datetime.datetime(2024, 6, 1, 12, 0, tzinfo=datetime.timezone.utc),
-            'note': 'Expect original value when at_time is set and unit is None',
-            'unit': None
+            "value": datetime.datetime(2024, 6, 1, 12, 0, tzinfo=datetime.timezone.utc),
+            "at_time": datetime.time(15, 30),
+            "expected": datetime.datetime(
+                2024, 6, 1, 12, 0, tzinfo=datetime.timezone.utc
+            ),
+            "note": "Expect original value when at_time is set and unit is None",
+            "unit": None,
         },
         {
-            'value': datetime.datetime(2024, 6, 1, 12, 0, tzinfo=datetime.timezone.utc),
-            'at_time': datetime.time(15, 30),
-            'expected': datetime.datetime(2024, 6, 1, 12, 30, tzinfo=datetime.timezone.utc),
-            'note': 'Expect value moved to at_time when unit is set to HOURS e.g. 12:00 -> 12:30',
-            'unit': TimeUnit.HOURS.value
+            "value": datetime.datetime(2024, 6, 1, 12, 0, tzinfo=datetime.timezone.utc),
+            "at_time": datetime.time(15, 30),
+            "expected": datetime.datetime(
+                2024, 6, 1, 12, 30, tzinfo=datetime.timezone.utc
+            ),
+            "note": "Expect value moved to at_time when unit is set to HOURS e.g. 12:00 -> 12:30",
+            "unit": TimeUnit.HOURS.value,
         },
         {
-            'value': datetime.datetime(2024, 6, 1, 12, 0, tzinfo=datetime.timezone.utc),
-            'at_time': datetime.time(15, 30),
-            'expected': datetime.datetime(2024, 6, 1, 15, 30, tzinfo=datetime.timezone.utc),
-            'note': 'Expect value moved to at_time when unit is set to DAYS e.g. 12:00 -> 15:30',
-            'unit': TimeUnit.DAYS.value
-        }
+            "value": datetime.datetime(2024, 6, 1, 12, 0, tzinfo=datetime.timezone.utc),
+            "at_time": datetime.time(15, 30),
+            "expected": datetime.datetime(
+                2024, 6, 1, 15, 30, tzinfo=datetime.timezone.utc
+            ),
+            "note": "Expect value moved to at_time when unit is set to DAYS e.g. 12:00 -> 15:30",
+            "unit": TimeUnit.DAYS.value,
+        },
     ]
 
     for item in cases:
         instance.at_timezone = pytz.UTC
-        instance.at_time = item['at_time']
-        instance.unit = item['unit']
+        instance.at_time = item["at_time"]
+        instance.unit = item["unit"]
 
-        result = instance._move_to_at_time(item['value'])
-        assert result == item['expected'], item['note']
+        result = instance._move_to_at_time(item["value"])
+        assert result == item["expected"], item["note"]
 
 
 def test_utc_offset_correction(interval_time):
     instance = Job(interval=interval_time)
     cases = [
         {
-            'value': datetime.datetime(2024, 6, 1, 12, 0, tzinfo=datetime.timezone.utc),
-            'expected': datetime.datetime(2024, 6, 1, 12, 0, tzinfo=datetime.timezone.utc),
-            'note': 'No offset change expected for UTC time',
-            'at_timezone': None,
-            'restore': False
+            "value": datetime.datetime(2024, 6, 1, 12, 0, tzinfo=datetime.timezone.utc),
+            "expected": datetime.datetime(
+                2024, 6, 1, 12, 0, tzinfo=datetime.timezone.utc
+            ),
+            "note": "No offset change expected for UTC time",
+            "at_timezone": None,
+            "restore": False,
         },
         {
-            'value': datetime.datetime(2024, 6, 1, 12, 0, tzinfo=datetime.timezone(datetime.timedelta(hours=-5))),
-            'expected': datetime.datetime(2024, 6, 1, 12, 0, tzinfo=datetime.timezone(datetime.timedelta(hours=-5))),
-            'note': 'No offset change expected for EST time',
-            'at_timezone': pytz.UTC,
-            'restore': True
+            "value": datetime.datetime(
+                2024,
+                6,
+                1,
+                12,
+                0,
+                tzinfo=datetime.timezone(datetime.timedelta(hours=-5)),
+            ),
+            "expected": datetime.datetime(
+                2024,
+                6,
+                1,
+                12,
+                0,
+                tzinfo=datetime.timezone(datetime.timedelta(hours=-5)),
+            ),
+            "note": "No offset change expected for EST time",
+            "at_timezone": pytz.UTC,
+            "restore": True,
         },
     ]
 
     for item in cases:
         instance = Job(interval=10)
-        if item['at_timezone'] is not None:
-            instance.at_timezone = item['at_timezone']
+        if item["at_timezone"] is not None:
+            instance.at_timezone = item["at_timezone"]
 
         result = instance._utc_offset_correction(
-            item['value'],
-            restore_time=item['restore']
+            item["value"], restore_time=item["restore"]
         )
 
-        assert result == item['expected'], item['note']
+        assert result == item["expected"], item["note"]
 
 
 def test_schedule_next_run(interval_time):
@@ -86,35 +107,38 @@ def test_schedule_next_run(interval_time):
 
     cases = [
         {
-            'unit': TimeUnit.MINUTES.value,
-            'start_day': None,
-            'expected': datetime.datetime.now(pytz.UTC) + datetime.timedelta(minutes=interval_time),
-            'note': 'Next run should be scheduled 10 minutes from now when unit is MINUTES'
+            "unit": TimeUnit.MINUTES.value,
+            "start_day": None,
+            "expected": datetime.datetime.now(pytz.UTC)
+            + datetime.timedelta(minutes=interval_time),
+            "note": "Next run should be scheduled 10 minutes from now when unit is MINUTES",
         },
         {
-            'unit': TimeUnit.HOURS.value,
-            'start_day': None,
-            'expected': datetime.datetime.now(pytz.UTC) + datetime.timedelta(hours=interval_time),
-            'note': 'Next run should be scheduled 10 hours from now when unit is HOURS'
+            "unit": TimeUnit.HOURS.value,
+            "start_day": None,
+            "expected": datetime.datetime.now(pytz.UTC)
+            + datetime.timedelta(hours=interval_time),
+            "note": "Next run should be scheduled 10 hours from now when unit is HOURS",
         },
         {
-            'unit': TimeUnit.WEEKS.value,
-            'start_day': 'wednesday',
-            'expected': datetime.datetime.now(pytz.UTC) + datetime.timedelta(days=interval_time),
-            'note': 'Next run should be scheduled to the next Wednesday when unit is WEEKS and start_day is set'
-        }
+            "unit": TimeUnit.WEEKS.value,
+            "start_day": "wednesday",
+            "expected": datetime.datetime.now(pytz.UTC)
+            + datetime.timedelta(days=interval_time),
+            "note": "Next run should be scheduled to the next Wednesday when unit is WEEKS and start_day is set",
+        },
     ]
 
     for item in cases:
         current_date = datetime.datetime.now(pytz.UTC)
 
-        instance.unit = item['unit']
-        instance.start_day = item['start_day']
+        instance.unit = item["unit"]
+        instance.start_day = item["start_day"]
 
         instance._schedule_next_run()
 
-        assert instance.next_run is not None, item['note']
-        assert instance.next_run > current_date, item['note']
+        assert instance.next_run is not None, item["note"]
+        assert instance.next_run > current_date, item["note"]
 
 
 class TestJob:
@@ -122,8 +146,6 @@ class TestJob:
     def setup(self):
         self._base_interval = 10
         self.job_instance = Job(interval=self._base_interval)
-
-
 
     def test_do(self):
         # Test that do() correctly assigns the job function and schedules the next run
@@ -135,7 +157,8 @@ class TestJob:
 
     def test_at(self):
         pytest.skip(
-            "Skipping test_at() as it requires more complex setup for time mocking.")
+            "Skipping test_at() as it requires more complex setup for time mocking."
+        )
         cases = [
             # {
             #     'value': datetime.time(15, 30),
@@ -143,25 +166,25 @@ class TestJob:
             #     'label': "every 10 days at 15:30:00"
             # },
             {
-                'value': datetime.time(8, 0),
-                'unit': TimeUnit.HOURS.value,
-                'label': "every 10 hours at 08:00:00"
+                "value": datetime.time(8, 0),
+                "unit": TimeUnit.HOURS.value,
+                "label": "every 10 hours at 08:00:00",
             }
         ]
 
         for item in cases:
-            self.job_instance.unit = item['unit']
-            self.job_instance.at(item['value'])
+            self.job_instance.unit = item["unit"]
+            self.job_instance.at(item["value"])
 
-            assert self.job_instance.at_time == item['value']
+            assert self.job_instance.at_time == item["value"]
 
     def test_add_tags(self):
-        self.job_instance.tags('tag1', 'tag2')
+        self.job_instance.tags("tag1", "tag2")
 
-        assert 'tag1' in self.job_instance._tags
-        assert 'tag2' in self.job_instance._tags
+        assert "tag1" in self.job_instance._tags
+        assert "tag2" in self.job_instance._tags
         # Add normal tags
-        has_tags = self.job_instance.has_tags('tag1')
+        has_tags = self.job_instance.has_tags("tag1")
 
         # Add noee string tags
         with pytest.raises(TypeError):
@@ -178,49 +201,49 @@ class TestJob:
     def test_get_label(self):
         cases = [
             {
-                'interval': 10,
-                'unit': TimeUnit.MINUTES.value,
-                'at_time': None,
-                'expected': "every 10 minutes",
-                'note': 'Label should be "every 10 minutes" when at_time is None'
+                "interval": 10,
+                "unit": TimeUnit.MINUTES.value,
+                "at_time": None,
+                "expected": "every 10 minutes",
+                "note": 'Label should be "every 10 minutes" when at_time is None',
             },
             {
-                'interval': 5,
-                'unit': TimeUnit.HOURS.value,
-                'at_time': datetime.time(15, 30),
-                'expected': "every 5 hours at 15:30:00",
-                'note': 'Label should be "every 5 hours at 15:30:00" when at_time is set'
+                "interval": 5,
+                "unit": TimeUnit.HOURS.value,
+                "at_time": datetime.time(15, 30),
+                "expected": "every 5 hours at 15:30:00",
+                "note": 'Label should be "every 5 hours at 15:30:00" when at_time is set',
             },
             {
-                'interval': 5,
-                'unit': TimeUnit.HOURS.value,
-                'at_time': None,
-                'expected': "every 5 hours",
-                'note': 'Label should be "every 5 hours" when at_time is None'
+                "interval": 5,
+                "unit": TimeUnit.HOURS.value,
+                "at_time": None,
+                "expected": "every 5 hours",
+                "note": 'Label should be "every 5 hours" when at_time is None',
             },
             {
-                'interval': 1,
-                'unit': TimeUnit.DAYS.value,
-                'at_time': datetime.time(8, 0),
-                'expected': "every 1 days at 08:00:00",
-                'note': 'Label should be "every 1 days at 08:00:00" when at_time is set'
+                "interval": 1,
+                "unit": TimeUnit.DAYS.value,
+                "at_time": datetime.time(8, 0),
+                "expected": "every 1 days at 08:00:00",
+                "note": 'Label should be "every 1 days at 08:00:00" when at_time is set',
             },
             {
-                'interval': 3,
-                'unit': TimeUnit.DAYS.value,
-                'at_time': datetime.time(8, 0),
-                'expected': "every 3 days at 08:00:00",
-                'note': 'Label should be "every 3 days at 08:00:00" when at_time is set'
-            }
+                "interval": 3,
+                "unit": TimeUnit.DAYS.value,
+                "at_time": datetime.time(8, 0),
+                "expected": "every 3 days at 08:00:00",
+                "note": 'Label should be "every 3 days at 08:00:00" when at_time is set',
+            },
         ]
 
         for item in cases:
-            self.job_instance.interval = item['interval']
-            self.job_instance.unit = item['unit']
-            self.job_instance.at_time = item['at_time']
+            self.job_instance.interval = item["interval"]
+            self.job_instance.unit = item["unit"]
+            self.job_instance.at_time = item["at_time"]
 
             label = self.job_instance._get_label()
-            assert label == item['expected'], item['note']
+            assert label == item["expected"], item["note"]
 
     def test_job_in_set(self):
         job1 = Job(interval=10)
@@ -229,8 +252,9 @@ class TestJob:
         job_set = {job1, job2}
 
         assert job1 == job1, "A job should be equal to itself"
-        assert len(
-            job_set) == 2, "Both jobs should be in the set since they have different UUIDs"
+        assert len(job_set) == 2, (
+            "Both jobs should be in the set since they have different UUIDs"
+        )
 
         job_set.remove(job1)
 
@@ -244,17 +268,11 @@ class TestJob:
         assert j1.should_run is False, "Job should not run if next_run is None"
 
         # False if date in the future
-        j1.next_run = (
-            datetime.datetime.now(pytz.UTC) +
-            datetime.timedelta(seconds=10)
-        )
+        j1.next_run = datetime.datetime.now(pytz.UTC) + datetime.timedelta(seconds=10)
         assert j1.should_run is False, "Job should not run if next_run is in the future"
 
         # True if date in the past
-        j1.next_run = (
-            datetime.datetime.now(pytz.UTC) -
-            datetime.timedelta(seconds=10)
-        )
+        j1.next_run = datetime.datetime.now(pytz.UTC) - datetime.timedelta(seconds=10)
         assert j1.should_run is True, "Job should run if next_run is in the past"
 
 
@@ -290,4 +308,6 @@ def test_serialization():
     data = j.destructure()
 
     assert isinstance(data, dict), "Destructured job should be a dictionary"
-    assert data['interval'] == j.interval, "Interval should be preserved in destructured data"
+    assert data["interval"] == j.interval, (
+        "Interval should be preserved in destructured data"
+    )
