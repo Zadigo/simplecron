@@ -1,85 +1,71 @@
 import asyncio
 import time
-from typing import Any, NoReturn
-from simplecron.typings import TypeBaseScheduler, TypeJob, TypeJobFunction
-from simplecron.utils import TimeUnit
+from typing import NoReturn
+from simplecron.typings import TypeBaseScheduler
 import threading
-from asgiref.sync import sync_to_async
+from simplecron.base import BaseScheduler, Job
+from abc import ABC, abstractmethod
+import uuid
+from simplecron.context import Context  
 
 
-class Context:
-    queue = asyncio.Queue()
-    lock = asyncio.Lock()
+class BackgroundThread(threading.Thread):
+    def __init__(self, *schedulers: TypeBaseScheduler, scheduler_context: Context = None) -> None:
+        super().__init__(daemon=True)
 
-    def __init__(self):
-        self.is_done: bool = False
+        self.name = f"bgt-{uuid.uuid4()}"
+        self.schedulers = schedulers
 
-    def add(self, key: str, value: Any):
-        setattr(self, key, value)
+        self._scheduler_context = scheduler_context or Context()
+        self._scheduler_context.setdefault('main_scheduler_name', self.name)
+        self._scheduler_context.setdefault('main_scheduler', self)
 
-    def remove(self, key: str):
-        if hasattr(self, key):
-            delattr(self, key)
+        self._stop_event = threading.Event()
 
-    def get_all(self) -> list[tuple[str, Any]]:
-        clean_values = filter(lambda x: not x.startswith("__"), dir(self))
-        return [(key, getattr(self, key)) for key in clean_values if not callable(getattr(self, key))]
+    def run(self) -> NoReturn:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
 
-    def done(self):
-        self.is_done = True
+        while not self._stop_event.is_set():
+            for scheduler in self.schedulers:
+                scheduler.run_pending(context=self._scheduler_context)
+
+            time.sleep(1)
 
 
-class Schedulers:
-    """A class to manage multiple schedulers and run them in a blocking manner."""
+class BackgroundSchedulerInterface(ABC):
+    @abstractmethod
+    def create(self, *schedulers: TypeBaseScheduler, context: Context = None) -> BackgroundThread:
+        """Start the background scheduler."""
+        pass
 
-    schedulers: list[TypeBaseScheduler] = []
-    lock = threading.Semaphore(3)
 
-    def add(self, scheduler: TypeBaseScheduler, unit: TimeUnit, interval: int, job_func: TypeJobFunction, *args, **kwargs) -> TypeJob:
-        new_job = scheduler.create_every(interval=interval)
+class BackgroundScheduler(BackgroundSchedulerInterface):
+    """A scheduler that runs in the background as a separate thread."""
 
-        new_job.unit = unit.value
-        new_job.do(job_func, *args, **kwargs)
+    def create(self, *schedulers: TypeBaseScheduler, context: Context = None) -> BackgroundThread:
+        context = context or Context()
+        context.setdefault('main_scheduler', self)
 
-        self.schedulers.append(scheduler)
-        return new_job
+        instance = BackgroundThread(*schedulers, scheduler_context=context)
+        instance.start()
+        instance.join()
+        return instance
 
-    def start_blocking(self) -> NoReturn:
-        def loop():
-            while True:
-                for scheduler in self.schedulers:
-                    with self.lock:
-                        scheduler.run_pending()
-                time.sleep(1)
 
-        thread = threading.Thread(target=loop)
-        
-        thread.name = "RunningSchedulersThread"
-        thread.daemon = True
+def create_background_scheduler(runner: BackgroundSchedulerInterface, *schedulers: TypeBaseScheduler, context: Context = None) -> BackgroundThread:
+    """Create a background scheduler that runs in a separate thread."""
+    context = context or Context()
+    background_scheduler = runner.create(*schedulers, context=context)
+    return background_scheduler
 
-        thread.start()
-        thread.join()
 
-    async def async_blocking(self):
-        context = Context()
-        context.add("instance", self)
+s = BaseScheduler()
 
-        try:
-            while True:
-                async with asyncio.TaskGroup() as tg:
-                    for scheduler in self.schedulers:
-                        async_run_pending = sync_to_async(
-                            scheduler.run_pending,
-                            thread_sensitive=True
-                        )
-                        task = tg.create_task(async_run_pending())
+def executor(job: "Job", **kwargs):
+    print(f"Executing job: {job} with kwargs: {kwargs}")
 
-                        # task.set_name(f"Scheduler-{scheduler.id}-Task")
-                        # task.add_done_callback(
-                        #     lambda t: print(
-                        #         f"Scheduler {scheduler.id} task completed with result: {t.result()}")
-                        # )
-        except asyncio.CancelledError:
-            print("Async blocking loop cancelled.")
-        except KeyboardInterrupt:
-            print("Async blocking loop interrupted by user.")
+s.create_every(5).seconds.do(executor, google='great')
+
+instance = BackgroundScheduler()
+create_background_scheduler(instance, s)

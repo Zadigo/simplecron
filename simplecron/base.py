@@ -3,7 +3,7 @@ import functools
 import inspect
 import random
 import uuid
-from typing import Callable, Optional, Sequence
+from typing import Any, Callable, Optional, Sequence
 from warnings import warn
 from collections import defaultdict
 from functools import total_ordering
@@ -81,12 +81,12 @@ class BaseScheduler:
         for listener in listeners:
             listener.resolve(jobs)
 
-    def _run_job(self, job: "Job"):
+    def _run_job(self, job: "Job", **kwargs: Any):
         # Resolve event that occurs before the job is run
         listeners = self.event_listeners[utils.EventListenerEnum.BEFORE.value]
         self._resolve_listeners([job], *listeners)
 
-        result = job.run()
+        result = job.run(**kwargs)
         logger.info(f"Job executed: {job}")
         if isinstance(result, Cancel):
             self._cancel_job(job)
@@ -105,8 +105,12 @@ class BaseScheduler:
             return list(filter(lambda job: job.has_tags(*tags), self._jobs))
         return self._jobs
 
-    def run_pending(self):
-        """Run all jobs that are scheduled to run at the current time."""
+    def run_pending(self, **kwargs: Any):
+        """Run all jobs that are scheduled to run at the current time.
+        
+        Args:
+            **kwargs: Additional keyword arguments to pass to the job functions when they are executed.
+        """
         _jobs = sorted(filter(lambda job: job.should_run, self._jobs))
 
         # Resolve listerners before all jobs are run
@@ -114,11 +118,11 @@ class BaseScheduler:
         self._resolve_listeners(_jobs, *listeners)
 
         for job in _jobs:
-            self._run_job(job)
+            self._run_job(job, **kwargs)
 
-    def run_all(self):
+    def run_all(self, **kwargs: Any):
         for job in self._jobs:
-            self._run_job(job)
+            self._run_job(job, **kwargs)
 
     def clear(self):
         self._jobs.clear()
@@ -739,15 +743,15 @@ class Job:
         self.at_time = datetime.time(hour=hour, minute=minute, second=second)
         return self
 
-    def run(self) -> TypeJobReturn:
+    def run(self, **kwargs: Any) -> TypeJobReturn:
         if self._job_func is None:
             raise ValueError(
                 "No job function assigned. Use the 'do' method to assign a function.")
 
         if inspect.iscoroutinefunction(self._job_func):
-            result = async_to_sync(self._job_func)(self)
+            result = async_to_sync(self._job_func)(self, **kwargs)
         else:
-            result = self._job_func(self)
+            result = self._job_func(self, **kwargs)
 
         self.last_run = datetime.datetime.now()
         self._schedule_next_run()
