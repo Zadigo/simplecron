@@ -1,0 +1,71 @@
+name: Simplecron
+
+# on:
+#   pull_request: 
+#     types: [opened, synchronize, reopened]
+#     branches:
+#       - develop
+#       - main
+#   merge_group:
+#     branches:
+#       - develop
+#       - main
+#       - stable/*
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Frontend Admin environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+
+env:
+  PYTHON_VERSION: 3.14
+ 
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        node: [24]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Install Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install uvicorn
+        run: pip install uvicorn[standard]
+      - name: Install dependencies
+        run: |
+          uv sync
+          pytest
+    
+  build:
+    runs-on: ${{ matrix.os }}
+    if: (github.event_name == 'merge_group' && (github.base_ref == 'main' || startsWith(github.base_ref, 'stable/')))
+    needs: [test]
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        node: [24]
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Install Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install dependencies
+        run: |
+          uv sync
+          uv build --env ${{ github.event.inputs.environment }}
