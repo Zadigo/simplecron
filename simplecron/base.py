@@ -296,7 +296,12 @@ class Job:
     @property
     def get_current_time(self) -> datetime.datetime:
         """Get the current time in the job's timezone or UTC if no timezone is set."""
-        return datetime.datetime.now(self.at_timezone or datetime.timezone.utc)
+        return datetime.datetime.now(self.get_timezone)
+
+    @property
+    def get_timezone(self) -> datetime.timezone:
+        """Get the timezone of the job or UTC if no timezone is set."""
+        return self.at_timezone or datetime.timezone.utc
 
     @property
     def should_run(self) -> bool:
@@ -489,47 +494,45 @@ class Job:
     def _utc_offset_correction(
         self, dt: datetime.datetime, restore_time: bool = False
     ) -> datetime.datetime:
-        """This function provides the option to keep the same wall-clock time even after correcting
-        the offset. For instance in the case of this hypothesis "run this job every day at 02:30 local time"
-        and where we want 02:30, not whatever time that `datetime.normalize` decides.
+        """Function that corrects the UTC offset of a datetime object responding to the
+        the problem of when the UTC offset changes because of daylight saving time (DST), should
+        the actual instant time be preserves or the local clock time be preserved instead.
+
+        So if a clock was set at 2:30 AM, with a UTC offset changes from -5 to -4, the function
+        will correct the datetime to 3:30 AM, preserving the local clock time.
 
         Args:
             dt (datetime.datetime): The datetime to be corrected.
             restore_time (bool): If True, the function will attempt to restore the original wall-clock time after correcting the UTC offset. Defaults to False.
         """
-        # Normalize corrects the utc-offset to match the timezone
-        # For example: When a date&time&offset does not exist within a timezone,
-        # the normalization will change the utc-offset to where it is valid.
-        # It does this while keeping the moment in time the same, by moving the
-        # time component opposite of the utc-change.
+        # Remember the original UTC offset
         before_value = dt.utcoffset()
-        moment = dt.astimezone(self.at_timezone)
+        # Convert ("normalize") into the target timezone
+        moment = dt.astimezone(self.get_timezone)
         after_value = moment.utcoffset()
 
-        # No change in utc-offset, return the original datetime
+        # If there's no change,
+        # return the original datetime
         if before_value == after_value:
             return moment
 
         if not restore_time:
             return moment
 
-        # Calculate the difference in utc-offset and adjust
-        # the moment to fixate the time
+        # CCompute how much the offset changed
         difference = after_value - before_value
-        # Adjust the moment to fixate the time,
-        # keeping the original time component intact
+        # Shift the datetime backwards
         moment -= difference
 
         if self.at_timezone is None:
             raise ValueError("at_timezone must be set for UTC offset correction.")
 
-        renormalized_moment = self.at_timezone.normalize(moment)
-        if renormalized_moment != after_value:
-            # We ended up in a DST Gap. The requested 'at' time does not exist
-            # within the current timezone/utc-offset. As a best effort, we will
-            # schedule the job 1 offset later than possible.
-            # For example, if 02:23 does not exist (because DST moves from 02:00
-            # to 03:00), this will schedule the job at 03:23.
+        # Check if the this local time actually valid If not
+        # move it to the closest valid time (DST Gap)
+        # For example, if 02:23 does not exist (because DST moves from 02:00
+        # to 03:00), this will schedule the job at 03:23.
+        renormalized_moment = self.get_timezone.normalize(moment)
+        if renormalized_moment != moment:
             moment += difference
         return renormalized_moment
 

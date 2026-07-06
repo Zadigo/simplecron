@@ -9,16 +9,27 @@ from simplecron.utils import TimeUnit
 
 
 @pytest.fixture
-def interval_time():
+def interval_fixture():
     return 10
 
 
-def test_move_to_at_time(interval_time):
-    instance = Job(interval=interval_time)
+@pytest.fixture
+def date_fixture():
+    return datetime.datetime(2024, 6, 1, 12, 0, tzinfo=datetime.timezone.utc)
+
+
+@pytest.fixture
+def date_fixture_offset():
+    tz = datetime.timezone(datetime.timedelta(hours=-5))
+    return datetime.datetime(2024, 6, 1, 12, 0, tzinfo=tz)
+
+
+def test_move_to_at_time(interval_fixture, date_fixture):
+    instance = Job(interval=interval_fixture)
 
     cases = [
         {
-            "value": datetime.datetime(2024, 6, 1, 12, 0, tzinfo=datetime.timezone.utc),
+            "value": date_fixture,
             "at_time": datetime.time(15, 30),
             "expected": datetime.datetime(
                 2024, 6, 1, 12, 0, tzinfo=datetime.timezone.utc
@@ -27,7 +38,7 @@ def test_move_to_at_time(interval_time):
             "unit": None,
         },
         {
-            "value": datetime.datetime(2024, 6, 1, 12, 0, tzinfo=datetime.timezone.utc),
+            "value": date_fixture,
             "at_time": datetime.time(15, 30),
             "expected": datetime.datetime(
                 2024, 6, 1, 12, 30, tzinfo=datetime.timezone.utc
@@ -36,13 +47,20 @@ def test_move_to_at_time(interval_time):
             "unit": TimeUnit.HOURS.value,
         },
         {
-            "value": datetime.datetime(2024, 6, 1, 12, 0, tzinfo=datetime.timezone.utc),
+            "value": date_fixture,
             "at_time": datetime.time(15, 30),
             "expected": datetime.datetime(
                 2024, 6, 1, 15, 30, tzinfo=datetime.timezone.utc
             ),
             "note": "Expect value moved to at_time when unit is set to DAYS e.g. 12:00 -> 15:30",
             "unit": TimeUnit.DAYS.value,
+        },
+        {
+            "value": None,
+            "at_time": None,
+            "expected": None,
+            "note": "Expect None when value and at_time are None",
+            "unit": None,
         },
     ]
 
@@ -55,13 +73,32 @@ def test_move_to_at_time(interval_time):
         assert result == item["expected"], item["note"]
 
 
-def test_utc_offset_correction(interval_time):
-    instance = Job(interval=interval_time)
+def test_utc_offset_correction(interval_fixture, date_fixture, date_fixture_offset):
+    instance = Job(interval=interval_fixture)
+
+    current_date = datetime.datetime.now()
+
+    params = {
+        "year": current_date.year,
+        "month": current_date.month,
+        "day": current_date.day,
+        "hour": 12,
+        "minute": 0,
+    }
+
     cases = [
         {
-            "value": datetime.datetime(2024, 6, 1, 12, 0, tzinfo=datetime.timezone.utc),
+            "value": datetime.datetime(
+                **{
+                    **params,
+                    "tzinfo": datetime.timezone.utc,
+                }
+            ),
             "expected": datetime.datetime(
-                2024, 6, 1, 12, 0, tzinfo=datetime.timezone.utc
+                **{
+                    **params,
+                    "tzinfo": datetime.timezone.utc,
+                }
             ),
             "note": "No offset change expected for UTC time",
             "at_timezone": None,
@@ -69,31 +106,43 @@ def test_utc_offset_correction(interval_time):
         },
         {
             "value": datetime.datetime(
-                2024,
-                6,
-                1,
-                12,
-                0,
-                tzinfo=datetime.timezone(datetime.timedelta(hours=-5)),
+                **{
+                    **params,
+                    "tzinfo": pytz.timezone("Europe/Paris"),
+                }
             ),
             "expected": datetime.datetime(
-                2024,
-                6,
-                1,
-                12,
-                0,
-                tzinfo=datetime.timezone(datetime.timedelta(hours=-5)),
+                **{
+                    **params,
+                    "tzinfo": pytz.UTC,
+                }
             ),
-            "note": "No offset change expected for EST time",
+            "note": "Expect UTC offset correction when there's a difference between the value's timezone and the at_timezone",
             "at_timezone": pytz.UTC,
+            "restore": True,
+        },
+        {
+            "value": datetime.datetime(
+                **{
+                    **params,
+                    "tzinfo": pytz.timezone("Europe/Paris"),
+                }
+            ),
+            "expected": datetime.datetime(
+                **{
+                    **params,
+                    "tzinfo": pytz.timezone("America/New_York"),
+                }
+            ),
+            "note": "Expect UTC offset correction between two different timezones",
+            "at_timezone": pytz.timezone("America/New_York"),
             "restore": True,
         },
     ]
 
     for item in cases:
         instance = Job(interval=10)
-        if item["at_timezone"] is not None:
-            instance.at_timezone = item["at_timezone"]
+        instance.at_timezone = item["at_timezone"]
 
         result = instance._utc_offset_correction(
             item["value"], restore_time=item["restore"]
@@ -102,29 +151,29 @@ def test_utc_offset_correction(interval_time):
         assert result == item["expected"], item["note"]
 
 
-def test_schedule_next_run(interval_time):
-    instance = Job(interval=10)
+def test_schedule_next_run(interval_fixture):
+    instance = Job(interval=interval_fixture)
 
     cases = [
         {
             "unit": TimeUnit.MINUTES.value,
             "start_day": None,
             "expected": datetime.datetime.now(pytz.UTC)
-            + datetime.timedelta(minutes=interval_time),
+            + datetime.timedelta(minutes=interval_fixture),
             "note": "Next run should be scheduled 10 minutes from now when unit is MINUTES",
         },
         {
             "unit": TimeUnit.HOURS.value,
             "start_day": None,
             "expected": datetime.datetime.now(pytz.UTC)
-            + datetime.timedelta(hours=interval_time),
+            + datetime.timedelta(hours=interval_fixture),
             "note": "Next run should be scheduled 10 hours from now when unit is HOURS",
         },
         {
             "unit": TimeUnit.WEEKS.value,
             "start_day": "wednesday",
             "expected": datetime.datetime.now(pytz.UTC)
-            + datetime.timedelta(days=interval_time),
+            + datetime.timedelta(days=interval_fixture),
             "note": "Next run should be scheduled to the next Wednesday when unit is WEEKS and start_day is set",
         },
     ]
