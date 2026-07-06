@@ -12,5 +12,12 @@
         "--cov=simplecron",
         "--cov-report=term-missing",
         "--cov-report=html:coverage_html"
-    ]
+    ],
+    "[python]": {
+        "editor.codeActionsOnSave": {
+            "source.organizeImports.ruff": "always",
+            "source.unusedImports": "always",
+            "source.fixAll.ruff": "always"
+        }
+    }
 }
