@@ -50,6 +50,7 @@ dev = [
     "pytest-env>=1.6.0",
     "pytest-reportlog>=1.0.0",
     "ruff>=0.15.20",
+    "schedule>=1.2.2",
 ]
 
 [project.urls]
