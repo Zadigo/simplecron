@@ -3,15 +3,21 @@ import functools
 import inspect
 import random
 import uuid
-from typing import Callable, Optional, Sequence, Union
-from warnings import warn
 from collections import defaultdict
 from functools import total_ordering
-from asgiref.sync import async_to_sync
+from typing import Callable, Optional, Sequence
+from warnings import warn
+
 import pytz
-from simplecron import exceptions
-from simplecron.typings import TypeDatetimes, TypeEventListenerCallback, TypeJobFunction, TypeJobReturn
-from simplecron import utils
+from asgiref.sync import async_to_sync
+
+from simplecron import exceptions, utils
+from simplecron.typings import (
+    TypeDatetimes,
+    TypeEventListenerCallback,
+    TypeJobFunction,
+    TypeJobReturn,
+)
 
 logger = utils.get_logger()
 
@@ -19,7 +25,7 @@ logger = utils.get_logger()
 class Cancel:
     """A class representing a cancellation signal for jobs.
 
-    This class is used to indicate that a job should be canceled. It can be returned from a job function 
+    This class is used to indicate that a job should be canceled. It can be returned from a job function
     to signal that the job should not be rescheduled::
 
         def my_job(job: Job):
@@ -98,7 +104,9 @@ class BaseScheduler:
     def _cancel_job(self, job: "Job"):
         if job in self._jobs:
             self._jobs.remove(job)
-            logger.warning(f"Job cancelled: {job}. Reason: {getattr(job, 'reason', 'No reason provided')}")
+            logger.warning(
+                f"Job cancelled: {job}. Reason: {getattr(job, 'reason', 'No reason provided')}"
+            )
 
     def jobs(self, *tags: str) -> list["Job"]:
         if tags:
@@ -150,7 +158,9 @@ class BaseScheduler:
         now = datetime.datetime.now(next_run.tzinfo or datetime.timezone.utc)
         return max(0, (next_run - now).total_seconds())
 
-    def with_event_listener(self, event: utils.EventListenerEnum, callback: TypeEventListenerCallback):
+    def with_event_listener(
+        self, event: utils.EventListenerEnum, callback: TypeEventListenerCallback
+    ):
         """Attaches a callback function to a specific event listener. There are three types of event listeners available:
 
         - `BEFORE`: Triggered before each job is run.
@@ -174,15 +184,12 @@ class BaseScheduler:
                 f"Invalid event listener: {event}. Must be one of {list(utils.EVENT_LISTENERS)}."
             )
 
-        self.event_listeners[event.value].append(
-            Listener(event.value, callback)
-        )
+        self.event_listeners[event.value].append(Listener(event.value, callback))
 
     def before_all_events(self, callbacks: Sequence[TypeEventListenerCallback]):
         """Attach multiple callback functions to the BEFORE_ALL event listener."""
         for callback in callbacks:
-            self.with_event_listener(
-                utils.EventListenerEnum.BEFORE_ALL, callback)
+            self.with_event_listener(utils.EventListenerEnum.BEFORE_ALL, callback)
 
     def before_events(self, callbacks: Sequence[TypeEventListenerCallback]):
         """Attach multiple callback functions to the BEFORE event listener."""
@@ -228,7 +235,7 @@ class Job:
         job_uuid (uuid.UUID): A unique identifier for the job, used for tracking and management.
     """
 
-    label_template = 'every {interval} {unit} at {at_time}'
+    label_template = "every {interval} {unit} at {at_time}"
 
     def __init__(self, interval: int, scheduler: Optional[BaseScheduler] = None):
         # The interval in seconds at which the job should run.
@@ -285,7 +292,7 @@ class Job:
     def __hash__(self):
         tags = tuple(sorted(self._tags))
         return hash((self.job_uuid, self._get_label(as_slug=True), *tags))
-    
+
     @property
     def get_current_time(self) -> datetime.datetime:
         """Get the current time in the job's timezone or UTC if no timezone is set."""
@@ -304,10 +311,7 @@ class Job:
     @property
     def second(self) -> "Job":
         if self.interval != 1:
-            raise exceptions.IntervalError(
-                self.interval,
-                expected="equal to 1"
-            )
+            raise exceptions.IntervalError(self.interval, expected="equal to 1")
         return self.seconds
 
     @property
@@ -318,10 +322,7 @@ class Job:
     @property
     def minute(self) -> "Job":
         if self.interval != 1:
-            raise exceptions.IntervalError(
-                self.interval,
-                expected="equal to 1"
-            )
+            raise exceptions.IntervalError(self.interval, expected="equal to 1")
         return self.minutes
 
     @property
@@ -332,10 +333,7 @@ class Job:
     @property
     def hour(self) -> "Job":
         if self.interval != 1:
-            raise exceptions.IntervalError(
-                self.interval,
-                expected="equal to 1"
-            )
+            raise exceptions.IntervalError(self.interval, expected="equal to 1")
         return self.hours
 
     @property
@@ -346,10 +344,7 @@ class Job:
     @property
     def day(self) -> "Job":
         if self.interval != 1:
-            raise exceptions.IntervalError(
-                self.interval,
-                expected="equal to 1"
-            )
+            raise exceptions.IntervalError(self.interval, expected="equal to 1")
         return self.days
 
     @property
@@ -360,10 +355,7 @@ class Job:
     @property
     def week(self) -> "Job":
         if self.interval != 1:
-            raise exceptions.IntervalError(
-                self.interval,
-                expected="equal to 1"
-            )
+            raise exceptions.IntervalError(self.interval, expected="equal to 1")
         return self.weeks
 
     @property
@@ -374,71 +366,50 @@ class Job:
     @property
     def monday(self) -> "Job":
         if self.interval != 1:
-            raise exceptions.IntervalError(
-                self.interval,
-                expected="equal to 1"
-            )
-        self.start_day = 'monday'
+            raise exceptions.IntervalError(self.interval, expected="equal to 1")
+        self.start_day = "monday"
         return self.weeks
 
     @property
     def tuesday(self) -> "Job":
         if self.interval != 1:
-            raise exceptions.IntervalError(
-                self.interval,
-                expected="equal to 1"
-            )
-        self.start_day = 'tuesday'
+            raise exceptions.IntervalError(self.interval, expected="equal to 1")
+        self.start_day = "tuesday"
         return self.weeks
 
     @property
     def wednesday(self) -> "Job":
         if self.interval != 1:
-            raise exceptions.IntervalError(
-                self.interval,
-                expected="equal to 1"
-            )
-        self.start_day = 'wednesday'
+            raise exceptions.IntervalError(self.interval, expected="equal to 1")
+        self.start_day = "wednesday"
         return self.weeks
 
     @property
     def thursday(self) -> "Job":
         if self.interval != 1:
-            raise exceptions.IntervalError(
-                self.interval,
-                expected="equal to 1"
-            )
-        self.start_day = 'thursday'
+            raise exceptions.IntervalError(self.interval, expected="equal to 1")
+        self.start_day = "thursday"
         return self.weeks
 
     @property
     def friday(self) -> "Job":
         if self.interval != 1:
-            raise exceptions.IntervalError(
-                self.interval,
-                expected="equal to 1"
-            )
-        self.start_day = 'friday'
+            raise exceptions.IntervalError(self.interval, expected="equal to 1")
+        self.start_day = "friday"
         return self.weeks
 
     @property
     def saturday(self) -> "Job":
         if self.interval != 1:
-            raise exceptions.IntervalError(
-                self.interval,
-                expected="equal to 1"
-            )
-        self.start_day = 'saturday'
+            raise exceptions.IntervalError(self.interval, expected="equal to 1")
+        self.start_day = "saturday"
         return self.weeks
 
     @property
     def sunday(self) -> "Job":
         if self.interval != 1:
-            raise exceptions.IntervalError(
-                self.interval,
-                expected="equal to 1"
-            )
-        self.start_day = 'sunday'
+            raise exceptions.IntervalError(self.interval, expected="equal to 1")
+        self.start_day = "sunday"
         return self.weeks
 
     @classmethod
@@ -448,11 +419,11 @@ class Job:
         Args:
             data (dict): A dictionary containing the job's attributes.
         """
-        interval = data.pop('interval')
+        interval = data.pop("interval")
         job = cls(interval)
         job.__dict__.update(data)
         return job
-    
+
     def _must_cancel(self) -> bool:
         """Determine if the job should be cancelled based on its 'cancel_after' attribute.
 
@@ -470,7 +441,7 @@ class Job:
             text = self.label_template.format(
                 interval=self.interval,
                 unit=self.unit,
-                at_time=self.at_time.strftime("%H:%M:%S")
+                at_time=self.at_time.strftime("%H:%M:%S"),
             )
         else:
             _unit = self.unit
@@ -487,7 +458,7 @@ class Job:
 
         ## Example
 
-        With a job scheduled to run every day at `14:30`, if the current datetime is `2024-06-15 10:00`, 
+        With a job scheduled to run every day at `14:30`, if the current datetime is `2024-06-15 10:00`,
         calling this method will return a datetime of `2024-06-15 14:30`.
 
         Args:
@@ -499,23 +470,26 @@ class Job:
         if self.at_time is None:
             return dt
 
-        params = {
-            'second': self.at_time.second,
-            'microsecond': 0
-        }
+        params = {"second": self.at_time.second, "microsecond": 0}
 
         if self.unit == utils.TimeUnit.DAYS.value or self.start_day is not None:
             params.update(hour=self.at_time.hour, minute=self.at_time.minute)
 
-        if self.unit == utils.TimeUnit.DAYS.value or self.unit == utils.TimeUnit.HOURS.value or self.start_day is not None:
+        if (
+            self.unit == utils.TimeUnit.DAYS.value
+            or self.unit == utils.TimeUnit.HOURS.value
+            or self.start_day is not None
+        ):
             params.update(minute=self.at_time.minute)
 
         new_dt = dt.replace(**params)
         corrected_dt = self._utc_offset_correction(new_dt, restore_time=True)
         return corrected_dt
 
-    def _utc_offset_correction(self, dt: datetime.datetime, restore_time: bool = False) -> datetime.datetime:
-        """This function provides the option to keep the same wall-clock time even after correcting 
+    def _utc_offset_correction(
+        self, dt: datetime.datetime, restore_time: bool = False
+    ) -> datetime.datetime:
+        """This function provides the option to keep the same wall-clock time even after correcting
         the offset. For instance in the case of this hypothesis "run this job every day at 02:30 local time"
         and where we want 02:30, not whatever time that `datetime.normalize` decides.
 
@@ -547,8 +521,7 @@ class Job:
         moment -= difference
 
         if self.at_timezone is None:
-            raise ValueError(
-                "at_timezone must be set for UTC offset correction.")
+            raise ValueError("at_timezone must be set for UTC offset correction.")
 
         renormalized_moment = self.at_timezone.normalize(moment)
         if renormalized_moment != after_value:
@@ -561,7 +534,7 @@ class Job:
         return renormalized_moment
 
     def _schedule_next_run(self):
-        """Calculate and set the next run time for the job based 
+        """Calculate and set the next run time for the job based
         on its interval and unit."""
         if self.unit not in utils.TIME_UNITS:
             raise ValueError(
@@ -603,12 +576,11 @@ class Job:
             _next_run += period
 
         self.next_run = self._utc_offset_correction(
-            _next_run,
-            restore_time=self.at_time is not None
+            _next_run, restore_time=self.at_time is not None
         )
 
     def destructure(self) -> dict:
-        """Destructure the job instance into a 
+        """Destructure the job instance into a
         dictionary representation that can be easily serialized."""
         values: dict[str, str] = {}
 
@@ -678,7 +650,11 @@ class Job:
         self.scheduler._jobs.append(self)
         return self
 
-    def at(self, using: datetime.time, timezone: Optional[datetime.timezone | pytz.BaseTzInfo] = None) -> "Job":
+    def at(
+        self,
+        using: datetime.time,
+        timezone: Optional[datetime.timezone | pytz.BaseTzInfo] = None,
+    ) -> "Job":
         """Set a time at which the job should run.
 
         ## Example
@@ -716,8 +692,18 @@ class Job:
         Returns:
             Job: The current Job instance, allowing for method chaining.
         """
-        warn("This method is not complete. Use with caution. The 'at' method is intended to set a specific time for the job to run, but it may not handle all edge cases correctly.")
-        if self.unit not in [utils.TimeUnit.DAYS.value, utils.TimeUnit.HOURS.value, utils.TimeUnit.MINUTES.value] and self.start_day is None:
+        warn(
+            "This method is not complete. Use with caution. The 'at' method is intended to set a specific time for the job to run, but it may not handle all edge cases correctly."
+        )
+        if (
+            self.unit
+            not in [
+                utils.TimeUnit.DAYS.value,
+                utils.TimeUnit.HOURS.value,
+                utils.TimeUnit.MINUTES.value,
+            ]
+            and self.start_day is None
+        ):
             raise exceptions.AtScheduleError(self.unit)
 
         if timezone is not None:
@@ -754,7 +740,7 @@ class Job:
 
         self.at_time = datetime.time(hour=hour, minute=minute, second=second)
         return self
-    
+
     def until(self, limit: TypeDatetimes) -> "Job":
         """Set a limit for the job's execution, after which it will be cancelled."""
         if isinstance(limit, datetime.datetime):
@@ -762,9 +748,7 @@ class Job:
 
         if isinstance(limit, datetime.time):
             self.cancel_after = datetime.datetime.combine(
-                self.get_current_time.date(),
-                limit,
-                tzinfo=self.at_timezone
+                self.get_current_time.date(), limit, tzinfo=self.at_timezone
             )
 
         if isinstance(limit, datetime.timedelta):
@@ -774,21 +758,24 @@ class Job:
             raise ValueError(
                 f"Invalid limit type: {type(limit)}. Must be one of datetime.datetime, datetime.time, or datetime.timedelta."
             )
-        
+
         if self.cancel_after <= self.get_current_time:
             raise ValueError(
                 f"Invalid limit: {self.cancel_after}. Must be in the future."
             )
-        
+
         return self
 
     def run(self) -> TypeJobReturn:
         if self._job_func is None:
             raise ValueError(
-                "No job function assigned. Use the 'do' method to assign a function.")
-        
+                "No job function assigned. Use the 'do' method to assign a function."
+            )
+
         if self._must_cancel():
-            return Cancel(self, reason=f"Job cancelled after {self.cancel_after.isoformat()}")
+            return Cancel(
+                self, reason=f"Job cancelled after {self.cancel_after.isoformat()}"
+            )
 
         if inspect.iscoroutinefunction(self._job_func):
             result = async_to_sync(self._job_func)(self)
@@ -799,15 +786,17 @@ class Job:
         self._schedule_next_run()
 
         if self._must_cancel():
-            return Cancel(self, reason=f"Job cancelled after {self.cancel_after.isoformat()}")
+            return Cancel(
+                self, reason=f"Job cancelled after {self.cancel_after.isoformat()}"
+            )
 
         self.was_executed = True
         return result
 
 
 def every(interval: int, tag: Optional[str] = None) -> Job:
-    """Creates a new job instance using the default scheduler. This function 
-    is a convenient way to create jobs without needing to directly interact 
+    """Creates a new job instance using the default scheduler. This function
+    is a convenient way to create jobs without needing to directly interact
     with the scheduler.
 
     Args:
