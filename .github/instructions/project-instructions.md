@@ -28,7 +28,7 @@ simplecron
 
 - Testing: `pytest`
 - Build application: `uv build`
-- Build and upload to pypi test: `uv build && uv publish --index pypitest`
+- Build and upload to pypi test: `uv build && uv publish --index testpypi`
 - Bump dev version: `uv version --bump dev`
 
 ## References
