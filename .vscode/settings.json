@@ -19,7 +19,6 @@
         "--cov-report=html:simplecron-coverage",
         "--report-log=reports/reports.json",
         "-s",
-        "--reuse-db",
         "-rapP",
         "--durations=10",
         "--durations-min=1.0"

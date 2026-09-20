@@ -10,6 +10,5 @@ wheels/
 .venv
 
 pytest-*.json
-.coverage*
-*coverage_*
+*coverage*
 playground.py

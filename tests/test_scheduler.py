@@ -140,6 +140,7 @@ class TestBaseScheduler:
 
         s.create_every(1).minutes.do(executor)
         s.create_every(2).minutes.do(executor)
+        s.create_every(60).minutes.do(executor)
 
         next_run = s.get_next_run()
 

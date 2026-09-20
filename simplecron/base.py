@@ -12,7 +12,6 @@ import pytz
 
 from simplecron import exceptions, utils
 from simplecron.typings import (
-    TypeAsyncJobFunction,
     TypeDatetimes,
     TypeEventListenerCallback,
     TypeJobFunction,
@@ -176,7 +175,7 @@ class BaseScheduler:
         if not next_run:
             return None
 
-        now = datetime.datetime.now(next_run.tzinfo or datetime.timezone.utc)
+        now = datetime.datetime.now(next_run.tzinfo or datetime.UTC)
         return max(0, (next_run - now).total_seconds())
 
     def with_event_listener(
@@ -267,7 +266,7 @@ class Job:
         self.scheduler = scheduler
         # The function to be executed when the job runs.
         # It can be a callable or a Job instance.
-        self._job_func: TypeJobFunction | TypeAsyncJobFunction = None
+        self._job_func: TypeJobFunction = None
         # The latest time at which the job should run (if specified)
         self.latest: Optional[datetime.time] = None
 
