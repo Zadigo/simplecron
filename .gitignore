@@ -12,3 +12,4 @@ wheels/
 pytest-*.json
 *coverage*
 playground.py
+reports/*
