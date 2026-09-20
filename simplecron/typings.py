@@ -1,18 +1,19 @@
 import datetime
-from typing import TYPE_CHECKING, Any, Callable, Coroutine, Sequence, Union
-
+from typing import TYPE_CHECKING, Awaitable, Callable, Sequence, Union
 
 if TYPE_CHECKING:
-    from simplecron.base import BaseScheduler, Job, Cancel
+    from simplecron.base import BaseScheduler, Cancel, Job
 
 
 type TypeJob = "Job"
 
 type TypeJobReturn = "Cancel" | None
 
+type TypeJobFunction[T = "Job", R = TypeJobReturn] = Callable[[T], R] | Callable[[T]]
 
-# | Coroutine["Job", None, None]
-type TypeJobFunction[T = "Job", R = TypeJobReturn] = Callable[[T], R] | Callable[[T], Coroutine[Any, Any, R]]
+type TypeAsyncJobFunction[T = "Job", R = TypeJobReturn] = Callable[
+    [T], Awaitable[R]
+]
 
 type TypeBaseScheduler = "BaseScheduler"
 

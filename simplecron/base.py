@@ -1,6 +1,6 @@
 import datetime
 import functools
-import inspect
+import logging
 import random
 import uuid
 from collections import defaultdict
@@ -9,17 +9,24 @@ from typing import Callable, Optional, Sequence
 from warnings import warn
 
 import pytz
-from asgiref.sync import async_to_sync
 
 from simplecron import exceptions, utils
 from simplecron.typings import (
+    TypeAsyncJobFunction,
     TypeDatetimes,
     TypeEventListenerCallback,
     TypeJobFunction,
     TypeJobReturn,
 )
 
-logger = utils.get_logger()
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    handlers=[logging.StreamHandler()],
+)
+
+logger = logging.getLogger("simplecron")
 
 
 class Cancel:
@@ -33,12 +40,20 @@ class Cancel:
                 return Cancel(job)  # Signal to cancel the job
     """
 
-    def __init__(self, job: "Job", reason: str = None):
+    def __init__(
+        self,
+        job: "Job",
+        reason: str = None,
+        cancel_callback: Optional[Callable[["Job"], None]] = None,
+    ):
         self.job = job
         self.reason = reason
 
         if not self.job.is_cancelled:
             self.job.is_cancelled = True
+
+        if cancel_callback is not None:
+            cancel_callback(self.job)
 
 
 class Listener:
@@ -75,6 +90,12 @@ class Listener:
 
 
 class BaseScheduler:
+    """A base class for the Simplecron scheduler.
+
+    This class provides the core functionality for managing and executing scheduled jobs.
+    It handles job creation, cancellation, and event listener resolution.
+    """
+
     def __init__(self):
         self._jobs: list["Job"] = []
         self.event_listeners = defaultdict(list[Listener])
@@ -233,6 +254,8 @@ class Job:
         cancel_after (Optional[datetime.datetime]): An optional time of final run.
         tags (set[str]): A set of tags associated with the job.
         job_uuid (uuid.UUID): A unique identifier for the job, used for tracking and management.
+        is_cancelled (bool): A flag indicating whether the job has been cancelled.
+        was_executed (bool): A flag indicating whether the job has been executed at least once.
     """
 
     label_template = "every {interval} {unit} at {at_time}"
@@ -244,7 +267,7 @@ class Job:
         self.scheduler = scheduler
         # The function to be executed when the job runs.
         # It can be a callable or a Job instance.
-        self._job_func: TypeJobFunction = None
+        self._job_func: TypeJobFunction | TypeAsyncJobFunction = None
         # The latest time at which the job should run (if specified)
         self.latest: Optional[datetime.time] = None
 
@@ -266,8 +289,6 @@ class Job:
         self.cancel_after: Optional[datetime.datetime] = None
 
         self._tags: set[str] = set()
-        # Scheduler instance to which the job belongs. If not provided, the default scheduler will be used.
-        self.scheduler: Optional[BaseScheduler] = scheduler
         # Unique identifier for the job, used for tracking and management
         self.job_uuid = uuid.uuid4()
         # Indicates whether the job has been cancelled.
@@ -301,7 +322,8 @@ class Job:
     @property
     def get_timezone(self) -> datetime.timezone:
         """Get the timezone of the job or UTC if no timezone is set."""
-        return self.at_timezone or datetime.timezone.utc
+        self.at_timezone = self.at_timezone or datetime.timezone.utc
+        return self.at_timezone
 
     @property
     def should_run(self) -> bool:
@@ -653,6 +675,38 @@ class Job:
         self.scheduler._jobs.append(self)
         return self
 
+    # async def async_do(self, job_func: TypeAsyncJobFunction, *args, **kwargs) -> "Job":
+    #     """Assign an asynchronous function to be executed when the job runs.
+
+    #     Args:
+    #         job_func (TypeAsyncJobFunction): The asynchronous function to be executed when the job runs.
+    #         *args: Positional arguments to pass to the job function.
+    #         **kwargs: Keyword arguments to pass to the job function.
+
+    #     Returns:
+    #         Job: The current Job instance, allowing for method chaining.
+
+    #     Raises:
+    #         SchedulerNotFoundError: If the job is created without an associated scheduler.
+
+    #     Example::
+
+    #         import simplecron
+
+    #         simplecron.every(10).seconds.async_do(my_async_job_function)
+
+    #         while True:
+    #             simplecron.run_pending()
+    #     """
+    #     self._job_func = functools.partial(job_func, *args, **kwargs)
+    #     functools.update_wrapper(self._job_func, job_func)
+
+    #     if self.scheduler is None:
+    #         raise exceptions.SchedulerNotFoundError()
+
+    #     self.scheduler._jobs.append(self)
+    #     return self
+
     def at(
         self,
         using: datetime.time,
@@ -780,10 +834,7 @@ class Job:
                 self, reason=f"Job cancelled after {self.cancel_after.isoformat()}"
             )
 
-        if inspect.iscoroutinefunction(self._job_func):
-            result = async_to_sync(self._job_func)(self)
-        else:
-            result = self._job_func(self)
+        result = self._job_func(self)
 
         self.last_run = self.get_current_time
         self._schedule_next_run()
@@ -795,6 +846,41 @@ class Job:
 
         self.was_executed = True
         return result
+
+    # async def async_run(self) -> TypeJobReturn:
+    #     if self._job_func is None:
+    #         raise ValueError(
+    #             "No job function assigned. Use the 'do' method to assign a function."
+    #         )
+
+    #     if self._must_cancel():
+    #         return Cancel(
+    #             self, reason=f"Job cancelled after {self.cancel_after.isoformat()}"
+    #         )
+
+    #     aw = self._job_func(self)
+    #     if not inspect.isawaitable(aw):
+    #         raise ValueError(
+    #             "The job function is not awaitable. Use the 'do' method to run a synchronous function."
+    #         )
+
+    #     def done_callback(t: asyncio.Task):
+    #         self.last_run = self.get_current_time
+    #         self._schedule_next_run()
+
+    #         self.was_executed = True
+
+    #     task = asyncio.create_task(aw)
+    #     task.add_done_callback(done_callback)
+
+    #     if self._must_cancel():
+    #         return Cancel(
+    #             self,
+    #             reason=f"Job cancelled after {self.cancel_after.isoformat()}",
+    #             cancel_callback=lambda job: task.cancel(),
+    #         )
+
+    #     return task
 
 
 def every(interval: int, tag: Optional[str] = None) -> Job:

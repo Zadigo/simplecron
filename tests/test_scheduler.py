@@ -5,8 +5,8 @@ import time
 import pytest
 import pytz
 
-from simplecron import exceptions, utils
-from simplecron.base import BaseScheduler, Job, Cancel
+from simplecron import utils
+from simplecron.base import BaseScheduler, Cancel, Job
 
 
 async def async_executor(job: Job):
@@ -50,6 +50,18 @@ class TestBaseScheduler:
         s.create_every(2).minutes.do(executor)
 
         assert len(s.jobs()) == 2
+
+    def test_get_label(self):
+        s = BaseScheduler()
+        job = s.create_every(1).minutes.do(executor)
+
+        label = job._get_label()
+        assert isinstance(label, str)
+        assert label == "every 1 minute"
+
+        label = job._get_label(as_slug=True)
+        assert isinstance(label, str)
+        assert label == "every-1-minute"
 
     def test_run_pending_jobs(self):
         s = BaseScheduler()
@@ -165,18 +177,10 @@ class TestBaseScheduler:
     def test_run_all_jobs_with_listeners(self):
         s = BaseScheduler()
 
+        s.with_event_listener(utils.EventListenerEnum.BEFORE, simple_before_listener)
+        s.with_event_listener(utils.EventListenerEnum.AFTER, simple_after_listener)
         s.with_event_listener(
-            utils.EventListenerEnum.BEFORE,
-            simple_before_listener
-
-        )
-        s.with_event_listener(
-            utils.EventListenerEnum.AFTER,
-            simple_after_listener
-        )
-        s.with_event_listener(
-            utils.EventListenerEnum.BEFORE_ALL,
-            simple_before_all_listener
+            utils.EventListenerEnum.BEFORE_ALL, simple_before_all_listener
         )
 
         # Create a job with an event listener
@@ -217,8 +221,6 @@ class TestBaseScheduler:
         assert s._jobs[0].was_executed is True
 
 
-
-
 class TestUntil:
     @pytest.mark.parametrize("limit_type", ["datetime", "time", "timedelta"])
     def test_until_with_various_types(self, limit_type):
@@ -233,11 +235,11 @@ class TestUntil:
         elif limit_type == "time":
             future_time = (current_time + datetime.timedelta(seconds=5)).time()
             job = s.create_every(1).seconds.do(executor).until(future_time)
-            
+
             assert job.cancel_after.time() == future_time
         elif limit_type == "timedelta":
             future_timedelta = datetime.timedelta(seconds=5)
             job = s.create_every(1).seconds.do(executor).until(future_timedelta)
             expected_cancel_after = current_time + future_timedelta
-            
+
             assert abs((job.cancel_after - expected_cancel_after).total_seconds()) < 1

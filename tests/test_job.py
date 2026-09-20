@@ -131,7 +131,9 @@ def test_utc_offset_correction(interval_fixture, date_fixture, date_fixture_offs
             "expected": datetime.datetime(
                 **{
                     **params,
-                    "tzinfo": pytz.timezone("America/New_York"),
+                    "tzinfo": datetime.timezone(
+                        datetime.timedelta(hours=-4)
+                    ),  # Assuming New York is UTC-4 during daylight saving time
                 }
             ),
             "note": "Expect UTC offset correction between two different timezones",
