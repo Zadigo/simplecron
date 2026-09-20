@@ -207,17 +207,29 @@ class BaseScheduler:
         self.event_listeners[event.value].append(Listener(event.value, callback))
 
     def before_all_events(self, callbacks: Sequence[TypeEventListenerCallback]):
-        """Attach multiple callback functions to the BEFORE_ALL event listener."""
+        """Attach multiple callback functions to the BEFORE_ALL event listener.
+
+        Args:
+            callbacks (Sequence[TypeEventListenerCallback]): A sequence of callback functions to be attached to the BEFORE_ALL event listener.
+        """
         for callback in callbacks:
             self.with_event_listener(utils.EventListenerEnum.BEFORE_ALL, callback)
 
     def before_events(self, callbacks: Sequence[TypeEventListenerCallback]):
-        """Attach multiple callback functions to the BEFORE event listener."""
+        """Attach multiple callback functions to the BEFORE event listener.
+
+        Args:
+            callbacks (Sequence[TypeEventListenerCallback]): A sequence of callback functions to be attached to the BEFORE event listener.
+        """
         for callback in callbacks:
             self.with_event_listener(utils.EventListenerEnum.BEFORE, callback)
 
     def after_events(self, callbacks: Sequence[TypeEventListenerCallback]):
-        """Attach multiple callback functions to the AFTER event listener."""
+        """Attach multiple callback functions to the AFTER event listener.
+
+        Args:
+            callbacks (Sequence[TypeEventListenerCallback]): A sequence of callback functions to be attached to the AFTER event listener.
+        """
         for callback in callbacks:
             self.with_event_listener(utils.EventListenerEnum.AFTER, callback)
 
@@ -527,10 +539,11 @@ class Job:
             restore_time (bool): If True, the function will attempt to restore the original wall-clock time after correcting the UTC offset. Defaults to False.
         """
         # Remember the original UTC offset
-        before_value = dt.utcoffset()
+        before_value = dt.utcoffset() or 0
+
         # Convert ("normalize") into the target timezone
         moment = dt.astimezone(self.get_timezone)
-        after_value = moment.utcoffset()
+        after_value = moment.utcoffset() or 0
 
         # If there's no change,
         # return the original datetime
@@ -540,7 +553,7 @@ class Job:
         if not restore_time:
             return moment
 
-        # CCompute how much the offset changed
+        # Compute how much the offset changed
         difference = after_value - before_value
         # Shift the datetime backwards
         moment -= difference
@@ -548,10 +561,10 @@ class Job:
         if self.at_timezone is None:
             raise ValueError("at_timezone must be set for UTC offset correction.")
 
-        # Check if the this local time actually valid If not
-        # move it to the closest valid time (DST Gap)
-        # For example, if 02:23 does not exist (because DST moves from 02:00
-        # to 03:00), this will schedule the job at 03:23.
+        # Check if the this local time actually valid.
+        # If not move it to the closest valid time (DST Gap)
+        # For example, if 02:23 does not exist (because DST
+        # moves from 02:00 to 03:00), this will schedule the job at 03:23.
         renormalized_moment = self.get_timezone.normalize(moment)
         if renormalized_moment != moment:
             moment += difference
@@ -577,7 +590,7 @@ class Job:
 
         # Get the current time in the specified timezone,
         # or UTC if no timezone is set
-        current_time = datetime.datetime.now(self.at_timezone)
+        current_time = datetime.datetime.now(self.get_timezone)
         _next_run = current_time
 
         if self.start_day is not None:
@@ -672,6 +685,7 @@ class Job:
             raise exceptions.SchedulerNotFoundError()
 
         self.scheduler._jobs.append(self)
+        logger.info("Job scheduled to start at %s", self.next_run)
         return self
 
     # async def async_do(self, job_func: TypeAsyncJobFunction, *args, **kwargs) -> "Job":
@@ -798,7 +812,11 @@ class Job:
         return self
 
     def until(self, limit: TypeDatetimes) -> "Job":
-        """Set a limit for the job's execution, after which it will be cancelled."""
+        """Set a limit for the job's execution, after which it will be cancelled.
+
+        Args:
+            limit (TypeDatetimes): The limit for the job's execution. Can be a datetime.datetime, datetime.time, or datetime.timedelta instance.
+        """
         if isinstance(limit, datetime.datetime):
             self.cancel_after = limit
 

@@ -1,9 +1,6 @@
-
-
 class IntervalError(Exception):
     def __init__(self, value: int, expected: str = "greater than 0"):
-        super().__init__(
-            f"Invalid interval: {value}. Interval must be {expected}.")
+        super().__init__(f"Invalid interval: {value}. Interval must be {expected}.")
 
 
 class SchedulerNotFoundError(Exception):
@@ -15,7 +12,7 @@ class SchedulerNotFoundError(Exception):
 
 class ScheduleValueError(Exception):
     def __init__(self, value: int):
-        items = ['hours', 'days', 'minutes']
+        items = ["hours", "days", "minutes"]
         super().__init__(
             f"Invalid schedule value: {value}. Must be one of {', '.join(items)}."
         )
@@ -24,5 +21,7 @@ class ScheduleValueError(Exception):
 class AtScheduleError(Exception):
     def __init__(self, unit: str):
         super().__init__(
-            "Invalid unit for 'at' scheduling. The 'at' method requires the unit to be either 'hours' or 'days'."
+            "Invalid unit for 'at' scheduling. The 'at' method requires the unit to be either "
+            "'hours' or 'days'. Check that you are calling the 'at' method after setting the unit "
+            "e.g. base.every(1).hours.at(...)"
         )
