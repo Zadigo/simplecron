@@ -2,8 +2,8 @@ import datetime
 import time
 
 import pytz
-from simplecron import base
-from simplecron.base import Cancel
+from src.simplecron import base
+from src.simplecron.base import Cancel
 
 
 def executor(job: base.Job):

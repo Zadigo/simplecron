@@ -3,9 +3,9 @@ import datetime
 import pytest
 import pytz
 
-from simplecron import exceptions
-from simplecron.base import BaseScheduler, Job
-from simplecron.utils import TimeUnit
+from src.simplecron import exceptions
+from src.simplecron.base import BaseScheduler, Job
+from src.simplecron.utils import TimeUnit
 
 
 @pytest.fixture

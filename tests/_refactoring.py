@@ -1,10 +1,11 @@
-from abc import ABC, abstractmethod
 import datetime
+from abc import ABC, abstractmethod
+from enum import Enum
+from typing import Callable, Optional, Self
 
 import pytz
-from simplecron import utils
-from typing import Callable, Optional, Self
-from enum import Enum
+
+from src.simplecron import utils
 
 
 class TimeUnit(Enum):
@@ -20,7 +21,13 @@ type TypeTimezone = datetime.timezone | pytz.BaseTzInfo
 
 
 class TBaseSchedule(ABC):
-    def __init__(self, tjob: "TJob", unit: TimeUnit, interval: int, timezone: Optional[TypeTimezone] = None):
+    def __init__(
+        self,
+        tjob: "TJob",
+        unit: TimeUnit,
+        interval: int,
+        timezone: Optional[TypeTimezone] = None,
+    ):
         self.tjob: "TJob" = tjob
         self.unit: TimeUnit = unit
         self.interval: int = interval
@@ -43,16 +50,13 @@ class TBaseSchedule(ABC):
         if self.at_time is None:
             return dt
 
-        params = {
-            'seconds': self.at_time.second,
-            'microsecond': 0
-        }
+        params = {"seconds": self.at_time.second, "microsecond": 0}
 
         if self.unit == TimeUnit.DAYS or self.start_day:
-            params['hour'] = self.at_time.hour
+            params["hour"] = self.at_time.hour
 
         if self.unit in [TimeUnit.DAYS, TimeUnit.WEEKS] or self.start_day is not None:
-            params['minute'] = self.at_time.minute
+            params["minute"] = self.at_time.minute
 
         new_dt = dt.replace(**params)
         return new_dt
@@ -95,7 +99,9 @@ class TDaily(TBaseSchedule):
         self.schedule_next_run()
         return self.tjob
 
-    def at(self, using: H, timezone: Optional[datetime.timezone | pytz.BaseTzInfo] = None) -> Self:
+    def at(
+        self, using: H, timezone: Optional[datetime.timezone | pytz.BaseTzInfo] = None
+    ) -> Self:
         if timezone is None:
             self.timezone = timezone
 
@@ -112,10 +118,7 @@ class TDaily(TBaseSchedule):
             if self.unit != TimeUnit.WEEKS:
                 pass
 
-            _next_run = utils.move_to_next_weekday(
-                current_time,
-                self.start_day
-            )
+            _next_run = utils.move_to_next_weekday(current_time, self.start_day)
 
         if self.at_time is not None:
             pass
@@ -161,10 +164,7 @@ class TJob:
     @property
     def january(self) -> TMonthly:
         instance = TMonthly(
-            self,
-            TimeUnit.MONTHS,
-            self.interval,
-            timezone=self.at_timezone
+            self, TimeUnit.MONTHS, self.interval, timezone=self.at_timezone
         )
         instance.start_month = "january"
         return instance
@@ -182,10 +182,7 @@ class TJob:
     @property
     def monday(self) -> TDaily:
         instance = TDaily(
-            self,
-            TimeUnit.WEEKS,
-            self.interval,
-            timezone=self.at_timezone
+            self, TimeUnit.WEEKS, self.interval, timezone=self.at_timezone
         )
         instance.start_day = "monday"
         return instance
@@ -243,16 +240,16 @@ class H:
                 )
             case TimeUnit.DAYS | TimeUnit.WEEKS:
                 return "H(<Every day at {hour:02d}:{minute:02d}:{second:02d}>)".format(
-                    hour=self.hour,
-                    minute=self.minute,
-                    second=self.second
+                    hour=self.hour, minute=self.minute, second=self.second
                 )
             case _:
-                return "H(<Every {unit} at {hour:02d}:{minute:02d}:{second:02d}>)".format(
-                    unit=self.unit.value if self.unit else "unknown",
-                    hour=self.hour,
-                    minute=self.minute,
-                    second=self.second
+                return (
+                    "H(<Every {unit} at {hour:02d}:{minute:02d}:{second:02d}>)".format(
+                        unit=self.unit.value if self.unit else "unknown",
+                        hour=self.hour,
+                        minute=self.minute,
+                        second=self.second,
+                    )
                 )
 
     def resolve(self, timezone: Optional[TypeTimezone] = None):
@@ -261,30 +258,27 @@ class H:
 
         self.timezone = timezone or datetime.timezone.utc
 
-        params = {
-            'second': self.second,
-            'microsecond': 0
-        }
+        params = {"second": self.second, "microsecond": 0}
 
         # Every minute when the second is X.
         # E.g. 10:15:30, 10:16:30, 10:17:30
         if self.unit == TimeUnit.MINUTES:
-            params['hour'] = 0
-            params['minute'] = 0
-            params['second'] = self.second
+            params["hour"] = 0
+            params["minute"] = 0
+            params["second"] = self.second
 
         # Every hour when the minute is X.
         # E.g. 10:15:00, 11:15:00, 12:15:00
         if self.unit == TimeUnit.HOURS:
-            params['hour'] = 0
-            params['minute'] = self.minute
+            params["hour"] = 0
+            params["minute"] = self.minute
 
         # Every day when the hour is X and the minute is Y.
         # E.g. Monday at 10:15:00, Tuesday at 10:15:00, Wednesday at 10:15:00
         if self.unit in [TimeUnit.DAYS, TimeUnit.WEEKS]:
-            params['hour'] = self.hour
-            params['minute'] = self.minute
-            params['second'] = self.second
+            params["hour"] = self.hour
+            params["minute"] = self.minute
+            params["second"] = self.second
 
         # Every <unit> when the hour is X, minute is Y and second is Z.
         # E.g. Every month at 10:15:00

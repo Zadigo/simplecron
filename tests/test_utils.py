@@ -1,4 +1,4 @@
-from simplecron import utils
+from src.simplecron import utils
 import pytest
 import datetime
 

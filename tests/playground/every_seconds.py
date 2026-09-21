@@ -1,8 +1,9 @@
 import time
 
 import pytz
-from simplecron import base, utils
-from simplecron.base import Cancel
+from src.simplecron import utils
+from src.simplecron.base import Cancel
+from src.simplecron import base
 
 
 def some_func(job: base.Job, *args, **kwargs):

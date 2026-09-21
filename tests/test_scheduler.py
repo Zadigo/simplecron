@@ -5,8 +5,8 @@ import time
 import pytest
 import pytz
 
-from simplecron import utils
-from simplecron.base import BaseScheduler, Cancel, Job
+from src.simplecron import utils
+from src.simplecron.base import BaseScheduler, Cancel, Job
 
 
 async def async_executor(job: Job):

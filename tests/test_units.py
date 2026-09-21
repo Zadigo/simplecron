@@ -2,9 +2,9 @@ import datetime
 
 import pytest
 
-from simplecron.base import Job
-from simplecron.utils import TimeUnit
-from simplecron.base import BaseScheduler
+from src.simplecron.base import Job
+from src.simplecron.utils import TimeUnit
+from src.simplecron.base import BaseScheduler
 
 
 def callback(job: Job):

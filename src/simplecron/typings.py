@@ -2,7 +2,7 @@ import datetime
 from typing import TYPE_CHECKING, Awaitable, Callable, Sequence, Union
 
 if TYPE_CHECKING:
-    from simplecron.base import BaseScheduler, Cancel, Job
+    from src.simplecron.base import BaseScheduler, Cancel, Job
 
 
 type TypeJob = "Job"

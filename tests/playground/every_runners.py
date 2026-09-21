@@ -1,7 +1,7 @@
-from simplecron.runners import Schedulers
-from simplecron.base import BaseScheduler, Job
-from simplecron.utils import TimeUnit
+from src.simplecron.runners import Schedulers
 
+from src.simplecron.base import BaseScheduler, Job
+from src.simplecron.utils import TimeUnit
 
 s = Schedulers()
 

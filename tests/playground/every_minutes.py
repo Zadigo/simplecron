@@ -1,6 +1,6 @@
 import time
 import datetime
-from simplecron import base
+from src.simplecron import base
 
 
 def some_func(job: base.Job, *args, **kwargs):
