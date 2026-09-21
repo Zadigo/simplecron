@@ -311,3 +311,97 @@ while True:
     base.run_pending()
     time.sleep(1)
 ```
+
+# Example Usage
+
+## Monitoring a page every 5 minutes
+
+The following example demonstrates how to monitor a web page every 5 minutes using Simplecron and Playwright:
+
+```Python
+from playwright.sync_api import Page, sync_playwright
+
+from simplecron import base
+from simplecron.base import Job, logger
+from simplecron.context import Context
+
+
+def monitor_page(job: Job, context: Context | None = None, **kwargs):
+    page: Page = context.json_data.get("page")
+    if page is not None:
+        page.reload()
+    logger.info("Page monitored...")
+
+
+base.every(30).seconds.do(monitor_page)
+
+
+def main():
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=False)
+        page = browser.new_page()
+
+        page.goto("https://example.com")
+        base.start_blocking(context={"page": page})
+
+        browser.close()
+
+
+if __name__ == "__main__":
+    main()
+```
+
+## Sending batch emails
+
+```Python
+import time
+from simplecron import base
+from simplecron.base import Job, logger
+from simplecron.providers import EmailProvider
+
+def send_batch_emails(job: Job):
+    logger.info("Sending batch emails...")
+
+base.default_scheduler.providers.attach(EmailProvider())
+base.every(10).minutes.do(send_batch_emails)
+
+while True:
+    base.run_pending()
+    time.sleep(1)
+```
+
+## Dockerizing the scheduler
+
+To dockerize the scheduler, you need to create a `Dockerfile` that sets up the Python environment and runs your scheduler script. The example below demonstrates how to do this using `uv`:
+
+```Dockerfile
+FROM python:3.14-slim
+
+# Copy the project into the image
+COPY . /app
+
+# Disable development dependencies
+ENV UV_NO_DEV=1
+
+# Sync the project into a new environment, asserting the lockfile is up to date
+WORKDIR /app
+RUN uv sync --locked
+
+# Presuming there is a `scheduler` command provided by the project
+CMD ["uv", "run", "scheduler"]
+```
+
+```Python
+import time
+from simplecron import base
+from simplecron.base import Job, logger
+
+def simple_function(job: Job):
+    logger.info("Executing simple function...")
+
+base.every(10).minutes.do(simple_function)
+
+while True:
+    base.run_pending()
+    time.sleep(1)
+```
