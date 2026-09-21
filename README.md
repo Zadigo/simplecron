@@ -1,6 +1,11 @@
 # Simple Cron
 
-Simplecron is a simple and lightweight Python library for scheduling tasks using cron-like syntax. It allows you to define jobs that run at specific intervals or times, making it easy to automate repetitive tasks in your applications. This project was inspired by [**schedule.**](https://github.com/dbader/schedule)
+Simplecron is a simple and lightweight Python library for scheduling tasks using cron-like syntax. It allows you to define jobs that run at specific intervals or times, making it easy to automate repetitive tasks in your applications.
+
+This project was inspired by [**schedule.**](https://github.com/dbader/schedule) and improved to add:
+
+* Asynchronous functionnalities
+* Redis, SQLite, Postgres provider support
 
 ## Creating a schedule
 
