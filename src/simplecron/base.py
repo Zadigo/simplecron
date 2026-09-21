@@ -1,17 +1,18 @@
 import datetime
 import functools
+import inspect
 import json
 import random
 import time
 import uuid
 from collections import defaultdict
 from functools import total_ordering
-from typing import Callable, Optional, Sequence
+from typing import Any, Callable, Optional, Sequence
 from warnings import warn
 
 import pytz
 
-from src.simplecron import exceptions
+from src.simplecron import exceptions, utils
 from src.simplecron.context import Context
 from src.simplecron.providers import JobNotificationMessage, Provider
 from src.simplecron.typings import (
@@ -21,7 +22,6 @@ from src.simplecron.typings import (
     TypeJobReturn,
 )
 from src.simplecron.utils import logger
-from src.simplecron import utils
 
 
 class Cancel:
@@ -122,6 +122,8 @@ class BaseScheduler:
         self.providers = Provider(self)
         self.scheduler_uuid = uuid.uuid4()
 
+        self.base_context = Context(scheduler_uuid=str(self.scheduler_uuid))
+
         logger.info(f"Scheduler UUID is: {self.scheduler_uuid}")
 
     def __repr__(self):
@@ -162,8 +164,12 @@ class BaseScheduler:
             return list(filter(lambda job: job.has_tags(*tags), self._jobs))
         return self._jobs
 
-    def run_pending(self):
+    def run_pending(self, context: dict[str, Any] = None):
         """Run all jobs that are scheduled to run at the current time."""
+        if context is not None:
+            self.base_context.json_data = self.base_context.json_data or {}
+            self.base_context.json_data.update(context)
+
         _jobs = sorted(filter(lambda job: job.should_run, self._jobs))
 
         # Resolve listerners before all jobs are run
@@ -277,15 +283,16 @@ class BaseScheduler:
             self.with_event_listener(utils.EventListenerEnum.AFTER, callback, for_tags)
 
     def with_context(self, context: Context):
-        """Attach a context to the scheduler.
+        """Replace the existing context of the scheduler with a new one.
 
         Args:
             context (Context): The context object to be attached to the scheduler.
         """
-        self.context = context
+        if context.scheduler_uuid is None:
+            context.scheduler_uuid = str(self.scheduler_uuid)
 
-    def with_memory(self, using: str):
-        pass
+        if context.json_data is not None:
+            self.base_context.json_data.update(context.json_data)
 
 
 default_scheduler = BaseScheduler()
@@ -925,7 +932,15 @@ class Job:
                 self, reason=f"Job cancelled after {self.cancel_after.isoformat()}"
             )
 
-        result = self._job_func(self)
+        signature = inspect.signature(self._job_func)
+        accepts_kwargs = any(
+            p.kind == inspect.Parameter.VAR_KEYWORD
+            for p in signature.parameters.values()
+        )
+        if not accepts_kwargs:
+            raise ValueError("The job function must accept **kwargs.")
+
+        result = self._job_func(self, context=self.scheduler.base_context)
 
         self.last_run = self.get_current_time
         self._schedule_next_run()
@@ -996,13 +1011,13 @@ def every(interval: int, tag: Optional[str] = None) -> Job:
     return default_scheduler.create_every(interval, tag)
 
 
-def run_pending():
+def run_pending(context: dict[str, Any] = None):
     """Run all jobs created in the default scheduler."""
-    default_scheduler.run_pending()
+    default_scheduler.run_pending(context=context)
 
 
-def start_blocking():
+def start_blocking(**kwargs: Any):
     """Start the default scheduler in a blocking loop."""
     while True:
-        default_scheduler.run_pending()
+        default_scheduler.run_pending(**kwargs)
         time.sleep(1)
