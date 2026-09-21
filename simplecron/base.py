@@ -50,14 +50,28 @@ class Cancel:
 
 
 class Listener:
-    """A class representing an event listener for jobs. It wraps
-    a callback function that is triggered on specific job events.
+    """A class representing an event listener for a specific job event.
+    It wraps a callback function that is triggered on specific job events.
+
+    Attributes:
+        event (str): The name of the event this listener is associated with.
+        callback (Callable[["Job" | Sequence["Job"]], None]): The callback function to be executed when the event is triggered.
+        counter (int): A counter tracking how many times the listener has been invoked.
+        for_tags (Optional[set[str]]): A set of tags that this listener is associated with.
+            If specified, the listener will only be triggered for jobs matching these tags. This does not apply
+            to the `before_all` event, which is triggered for all jobs regardless of their tags.
     """
 
-    def __init__(self, event: str, callback: Callable[["Job" | Sequence["Job"]], None]):
+    def __init__(
+        self,
+        event: str,
+        callback: Callable[["Job" | Sequence["Job"]], None],
+        for_tags: Optional[set[str]] = None,
+    ):
         self.event = event
         self.callback = callback
         self.counter: int = 0
+        self.for_tags = for_tags
 
     def __repr__(self):
         return f"<Listener(event={self.event}, counter={self.counter})>"
@@ -73,11 +87,14 @@ class Listener:
                 self.callback(jobs)
             else:
                 for job in jobs:
+                    if self.for_tags is not None:
+                        if not job.has_tags(*list(self.for_tags)):
+                            continue
                     self.callback(job)
         except Exception as e:
-            # Catch any exceptions created by the user coding mistakes
-            # without breaking the the main loop
-            print(f"Error in listener for event '{self.event}': {e}")
+            # Catch any exceptions created by the user
+            # coding mistakes without breaking the the main loop
+            logger.error(f"Error in listener for event '{self.event}': {e}")
 
         self.counter += 1
 
@@ -190,7 +207,10 @@ class BaseScheduler:
         return max(0, (next_run - now).total_seconds())
 
     def with_event_listener(
-        self, event: utils.EventListenerEnum, callback: TypeEventListenerCallback
+        self,
+        event: utils.EventListenerEnum,
+        callback: TypeEventListenerCallback,
+        for_tags: Optional[Sequence[str]] = None,
     ):
         """Attaches a callback function to a specific event listener. There are three types of event listeners available:
 
@@ -215,7 +235,7 @@ class BaseScheduler:
                 f"Invalid event listener: {event}. Must be one of {list(utils.EVENT_LISTENERS)}."
             )
 
-        self.event_listeners[event.value].append(Listener(event.value, callback))
+        self.event_listeners[event.value].append(Listener(event.value, callback, for_tags))
 
     def before_all_events(self, callbacks: Sequence[TypeEventListenerCallback]):
         """Attach multiple callback functions to the BEFORE_ALL event listener.
@@ -226,23 +246,23 @@ class BaseScheduler:
         for callback in callbacks:
             self.with_event_listener(utils.EventListenerEnum.BEFORE_ALL, callback)
 
-    def before_events(self, callbacks: Sequence[TypeEventListenerCallback]):
+    def before_events(self, callbacks: Sequence[TypeEventListenerCallback], for_tags: Optional[Sequence[str]] = None):
         """Attach multiple callback functions to the BEFORE event listener.
 
         Args:
             callbacks (Sequence[TypeEventListenerCallback]): A sequence of callback functions to be attached to the BEFORE event listener.
         """
         for callback in callbacks:
-            self.with_event_listener(utils.EventListenerEnum.BEFORE, callback)
+            self.with_event_listener(utils.EventListenerEnum.BEFORE, callback, for_tags)
 
-    def after_events(self, callbacks: Sequence[TypeEventListenerCallback]):
+    def after_events(self, callbacks: Sequence[TypeEventListenerCallback], for_tags: Optional[Sequence[str]] = None):
         """Attach multiple callback functions to the AFTER event listener.
 
         Args:
             callbacks (Sequence[TypeEventListenerCallback]): A sequence of callback functions to be attached to the AFTER event listener.
         """
         for callback in callbacks:
-            self.with_event_listener(utils.EventListenerEnum.AFTER, callback)
+            self.with_event_listener(utils.EventListenerEnum.AFTER, callback, for_tags)
 
     def with_context(self, context: Context):
         """Attach a context to the scheduler.
@@ -678,17 +698,17 @@ class Job:
         return self
 
     def has_tags(self, *tags: str) -> bool:
-        if not tags:
-            return False
+        """Check if the job has any of the specified tags.
 
-        truth_array: list[bool] = []
+        Args:
+            *tags (str): Tags to check against the job's tags.
 
-        for tag in tags:
-            if not isinstance(tag, str):
-                raise TypeError(f"Tag must be a string, got {type(tag)}")
-            truth_array.append(tag in self._tags)
-
-        return any(truth_array)
+        Returns:
+            bool: True if the job has any of the specified tags, False otherwise.
+        """
+        tags_to_check = set(tags)
+        matching_tags = self._tags.intersection(tags_to_check)
+        return bool(matching_tags)
 
     def do(self, job_func: TypeJobFunction, *args, **kwargs) -> "Job":
         """Assign a function to be executed when the job runs

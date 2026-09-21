@@ -133,21 +133,11 @@ default_scheduler.before_events(lambda job: print("Before job:", job))
 default_scheduler.after_events(lambda job: print("After job:", job))
 ```
 
-<!-- You can also attach event listeners to a specific jobs matching a certain set of tags or criteria. This allows you to have more granular control over which jobs trigger the event listeners.:
-
-```python
-from simplecron.base import default_scheduler
-from simplecron.utils import EventListenerEnum
-
-def before_all_jobs(jobs):
-	print("Before all jobs:", jobs)
-``` -->
-
 ## Jobs
 
 ### Cancelling
 
-To cancel a job, it simple needs to return an instance of `Cancel`.
+To cancel a job, it simply needs to return an instance of `Cancel`.
 
 ```python
 def callback(job: Job, *args, **kwargs):
@@ -213,7 +203,7 @@ default_scheduler.every(1).days.do(callback)
 
 **Every week**
 
-If not specific day and time is povided, the job will run automatically at the start of the week (Monday at 00:00). If you need to run the job at a specific day, you must use one of the properties `monday`, `tuesday`, `wednesday`, `thursday`, `friday`, `saturday` or `sunday`.
+If no specific day and time is povided, the job will run automatically at the start of the week (Monday at 00:00). If you need to run the job at a specific day, you must use one of the properties `monday`, `tuesday`, `wednesday`, `thursday`, `friday`, `saturday` or `sunday`.
 
 You can also use the `at` method to specify the time in 24-hour format (HH:MM).
 
@@ -235,4 +225,72 @@ default_scheduler.every(1).thursday.do(callback)
 default_scheduler.every(1).friday.do(callback)
 default_scheduler.every(1).saturday.do(callback)
 default_scheduler.every(1).sunday.do(callback)
+```
+
+## Tags
+
+Tags allow you to categorize and filter jobs based on specific labels. This can be useful for organizing jobs, applying actions to groups of jobs, or selectively running certain jobs based on their tags.
+
+```Python
+base.every(15, tag="my_tag").seconds.do(executor)
+```
+
+You can also attach event listeners to specific jobs matching a certain set of tags or criteria:
+
+```Python
+import time
+
+from simplecron.base import Job, default_scheduler, logger
+from simplecron.utils import EventListenerEnum
+
+
+def executor(job: Job):
+    logger.info("Executor called")
+
+
+def event_before(job: Job):
+    print("Before job:", job._tags)
+
+
+default_scheduler.create_every(10, tag="my_tag").seconds.do(executor)
+
+default_scheduler.with_event_listener(
+    EventListenerEnum.BEFORE, 
+	event_before, 
+	for_tags=["my_tag"]
+)
+
+while True:
+	default_scheduler.run_pending()
+	time.sleep(1)
+```
+
+## Providers
+
+Providers are external services or modules that can be integrated with the scheduler to extend its functionality. They allow you to connect your scheduled jobs with various platforms, APIs, or other systems seamlessly.
+
+### Redis Database provider
+
+The example below will save the details of the scheduler and the jobs that were runned in a Redis backend:
+
+```Python
+import time
+
+from simplecron import base
+from simplecron.base import Job, logger
+from simplecron.providers import RedisDatabase
+
+
+def executor(job: Job):
+    logger.warning("Executor called")
+
+
+base.default_scheduler.providers.attach(RedisDatabase())
+base.every(15).seconds.do(executor)
+base.every(30).seconds.do(executor)
+
+
+while True:
+    base.run_pending()
+    time.sleep(1)
 ```
