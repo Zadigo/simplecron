@@ -29,10 +29,22 @@ while True:
     time.sleep(1)
 ```
 
-By calling `every`, a new job is created. `schedule` attaches the unit of time to the job and finally `do` attaches the callback function.
+The same code can be achieved using the `start_blocking` function, which simplifies the blocking loop:
+
+```python
+from simplecron import base
+
+def callback(job: base.Job, *args, **kwargs):
+    print("Hello, World!", job)
+
+base.every(1).second.do(callback)
+base.start_blocking()
+```
+
+By calling `every`, a new job is created. `second` attaches the unit of time to the job and finally `do` attaches the callback function.
 
 > [!NOTE]
-> This is a blocking function, in other words, it will block the main thread and will not allow other code to run while it is executing.
+> `start_blocking` is a blocking function, in other words, it will block the main thread and will not allow other code to run while it is executing.
 
 ### Custom scheduler
 

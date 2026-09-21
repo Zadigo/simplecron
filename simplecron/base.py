@@ -2,6 +2,7 @@ import datetime
 import functools
 import json
 import random
+import time
 import uuid
 from collections import defaultdict
 from functools import total_ordering
@@ -235,7 +236,9 @@ class BaseScheduler:
                 f"Invalid event listener: {event}. Must be one of {list(utils.EVENT_LISTENERS)}."
             )
 
-        self.event_listeners[event.value].append(Listener(event.value, callback, for_tags))
+        self.event_listeners[event.value].append(
+            Listener(event.value, callback, for_tags)
+        )
 
     def before_all_events(self, callbacks: Sequence[TypeEventListenerCallback]):
         """Attach multiple callback functions to the BEFORE_ALL event listener.
@@ -246,7 +249,11 @@ class BaseScheduler:
         for callback in callbacks:
             self.with_event_listener(utils.EventListenerEnum.BEFORE_ALL, callback)
 
-    def before_events(self, callbacks: Sequence[TypeEventListenerCallback], for_tags: Optional[Sequence[str]] = None):
+    def before_events(
+        self,
+        callbacks: Sequence[TypeEventListenerCallback],
+        for_tags: Optional[Sequence[str]] = None,
+    ):
         """Attach multiple callback functions to the BEFORE event listener.
 
         Args:
@@ -255,7 +262,11 @@ class BaseScheduler:
         for callback in callbacks:
             self.with_event_listener(utils.EventListenerEnum.BEFORE, callback, for_tags)
 
-    def after_events(self, callbacks: Sequence[TypeEventListenerCallback], for_tags: Optional[Sequence[str]] = None):
+    def after_events(
+        self,
+        callbacks: Sequence[TypeEventListenerCallback],
+        for_tags: Optional[Sequence[str]] = None,
+    ):
         """Attach multiple callback functions to the AFTER event listener.
 
         Args:
@@ -987,3 +998,10 @@ def every(interval: int, tag: Optional[str] = None) -> Job:
 def run_pending():
     """Run all jobs created in the default scheduler."""
     default_scheduler.run_pending()
+
+
+def start_blocking():
+    """Start the default scheduler in a blocking loop."""
+    while True:
+        default_scheduler.run_pending()
+        time.sleep(1)
