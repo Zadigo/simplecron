@@ -1,7 +1,6 @@
 import time
 
-from simplecron import base
-from simplecron.base import Job, logger
+from simplecron.base import Job, default_scheduler, logger
 
 
 def executor(job: Job):
@@ -16,9 +15,11 @@ def after_callback(job: Job):
     logger.info("After callback called")
 
 
-base.every(15).seconds.do(executor)
+default_scheduler.every(15).seconds.do(executor)
+default_scheduler.before_events([before_callback])
+default_scheduler.after_events([after_callback])
 
 if __name__ == "__main__":
     while True:
-        base.run_pending()
+        default_scheduler.run_pending()
         time.sleep(1)

@@ -11,6 +11,7 @@ from warnings import warn
 import pytz
 
 from simplecron import exceptions, utils
+from simplecron.context import Context
 from simplecron.typings import (
     TypeDatetimes,
     TypeEventListenerCallback,
@@ -93,11 +94,18 @@ class BaseScheduler:
 
     This class provides the core functionality for managing and executing scheduled jobs.
     It handles job creation, cancellation, and event listener resolution.
+
+    Attributes:
+        _jobs (list["Job"]): A list of all scheduled jobs.
+        event_listeners (defaultdict): A dictionary mapping event names to their listeners.
+        context (Context | None): The context object attached to the scheduler, if any.
     """
 
     def __init__(self):
         self._jobs: list["Job"] = []
         self.event_listeners = defaultdict(list[Listener])
+        self.context: Context | None = None
+
         logger.info("Starting Simplecron scheduler...")
 
     def __repr__(self):
@@ -149,6 +157,7 @@ class BaseScheduler:
             self._run_job(job)
 
     def clear(self):
+        """Clear all scheduled jobs."""
         self._jobs.clear()
 
     def create_every(self, interval: int, tag: str = None) -> "Job":
@@ -233,8 +242,13 @@ class BaseScheduler:
         for callback in callbacks:
             self.with_event_listener(utils.EventListenerEnum.AFTER, callback)
 
-    def with_context(self, context: dict):
-        pass
+    def with_context(self, context: Context):
+        """Attach a context to the scheduler.
+
+        Args:
+            context (Context): The context object to be attached to the scheduler.
+        """
+        self.context = context
 
     def with_memory(self, using: str):
         pass
@@ -577,7 +591,7 @@ class Job:
             raise ValueError(
                 f"Invalid time unit: {self.unit}. Must be one of {list(utils.TIME_UNITS)}. "
                 "Before calling this method, you must call one of the unit propperties "
-                "(e.g., seconds, minutes, hours, days, weeks)."
+                "(e.g., seconds, minutes, hours, days, weeks) e.g., job.every(5).seconds.do(task)."
             )
 
         _interval = self.interval

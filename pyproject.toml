@@ -1,6 +1,6 @@
 [project]
 name = "simplecron"
-version = "0.1.0.dev4"
+version = "0.1.0.dev5"
 description = "Simplecron is a simple and lightweight Python library for scheduling tasks using cron-like syntax."
 readme = "README.md"
 requires-python = ">=3.14"
@@ -73,8 +73,6 @@ markers = [
     "integration: marks tests as integration tests",
     "unit: marks tests as unit tests",
 ]
-
-[tool.pytest.ini_options]
 
 [tool.pytest_env]
 env_files = [".env", ".env.test"]
