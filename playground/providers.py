@@ -6,11 +6,12 @@ from simplecron.providers import RedisDatabase
 
 
 def executor(job: Job):
-    logger.info("Executor called")
+    logger.warning("Executor called")
 
 
 base.default_scheduler.providers.attach(RedisDatabase())
-base.every(2).seconds.do(executor)
+base.every(15).seconds.do(executor)
+base.every(30).seconds.do(executor)
 
 if __name__ == "__main__":
     while True:

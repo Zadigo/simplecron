@@ -12,6 +12,7 @@ from simplecron.utils import logger
 
 
 class JobNotificationMessage(pydantic.BaseModel):
+    job_uuid: str = Field(...)
     runned_at: str = Field(...)
 
 
@@ -39,7 +40,11 @@ class BaseProvider(ABC):
         pass
 
     @abstractmethod
-    def notify(self, job: TypeJob, data: JobNotificationMessage) -> None:
+    def notify(
+        self,
+        job: TypeJob | None = None,
+        job_message: JobNotificationMessage | None = None,
+    ) -> None:
         pass
 
 
@@ -53,9 +58,17 @@ class Provider(BaseProvider):
         if observer in self.observers:
             self.observers.remove(observer)
 
-    def notify(self, job: TypeJob, data: JobNotificationMessage) -> None:
+    def notify(
+        self,
+        job: TypeJob | None = None,
+        job_message: JobNotificationMessage | None = None,
+    ) -> None:
         for observer in self.observers:
-            observer.update(self, job, data)
+            observer.update(self, job=job, job_message=job_message)
+
+    def initialize(self) -> None:
+        """Initialize the provider. This method can be used to set up any necessary resources or connections."""
+        pass
 
 
 class Observer(ABC):
@@ -70,7 +83,10 @@ class Observer(ABC):
 
     @abstractmethod
     def update(
-        self, provider: BaseProvider, job: TypeJob, data: JobNotificationMessage
+        self,
+        provider: BaseProvider,
+        job: TypeJob | None = None,
+        job_message: JobNotificationMessage | None = None,
     ) -> None:
         pass
 
@@ -98,19 +114,27 @@ class RedisDatabase(Observer):
             logger.error(f"Error connecting to Redis: {e}")
 
     def update(
-        self, provider: BaseProvider, job: TypeJob, data: JobNotificationMessage
+        self,
+        provider: BaseProvider,
+        job: TypeJob | None = None,
+        job_message: JobNotificationMessage | None = None,
     ) -> None:
-        next_run = provider._scheduler.get_next_run()
-        number_of_jobs = len(provider._scheduler.jobs())
-        json_jobs = [job.destructure() for job in provider._scheduler.jobs()]
+        if job is not None and job_message is not None:
+            next_run = provider._scheduler.get_next_run()
+            number_of_jobs = len(provider._scheduler.jobs())
+            json_jobs = [job.destructure() for job in provider._scheduler.jobs()]
 
-        run_details = ProviderSavedData(
-            next_run=str(next_run) if bool(next_run) else "",
-            number_of_jobs=number_of_jobs,
-            json_jobs=json.dumps(json_jobs),
-            last_sender=str(job.job_uuid),
-        )
+            run_details = ProviderSavedData(
+                next_run=str(next_run) if bool(next_run) else "",
+                number_of_jobs=number_of_jobs,
+                json_jobs=json.dumps(json_jobs),
+                last_sender=str(job_message.job_uuid) if bool(job_message) else "",
+            )
 
-        self.conn.hset(self.storage_key + ":details", mapping=run_details.model_dump())
-        self.conn.lpush(self.storage_key + ":runs", json.dumps(data.model_dump()))
-        self.conn.publish(str(self.uuid), json.dumps(run_details.model_dump()))
+            self.conn.hset(
+                self.storage_key + ":details", mapping=run_details.model_dump()
+            )
+            self.conn.lpush(
+                self.storage_key + ":runs", json.dumps(run_details.model_dump())
+            )
+            self.conn.publish(str(self.uuid), json.dumps(run_details.model_dump()))

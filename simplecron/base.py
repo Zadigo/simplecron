@@ -95,13 +95,15 @@ class BaseScheduler:
     """
 
     def __init__(self):
+        logger.info(f"Initializing Simplecron {self.__class__.__name__} scheduler...")
+
         self._jobs: list["Job"] = []
         self.event_listeners = defaultdict(list[Listener])
         self.context: Context | None = None
         self.providers = Provider(self)
         self.scheduler_uuid = uuid.uuid4()
 
-        logger.info("Starting Simplecron scheduler...")
+        logger.info(f"Scheduler UUID is: {self.scheduler_uuid}")
 
     def __repr__(self):
         return f"<BaseScheduler(jobs={len(self._jobs)})>"
@@ -651,7 +653,7 @@ class Job:
                 values[key] = value.__class__.__name__
                 continue
 
-            if key == '_tags':
+            if key == "_tags":
                 values[key] = ",".join(value)
                 continue
 
@@ -691,6 +693,16 @@ class Job:
     def do(self, job_func: TypeJobFunction, *args, **kwargs) -> "Job":
         """Assign a function to be executed when the job runs
 
+        ## Examples
+
+        .. code-block:: python
+            import simplecron
+
+            simplecron.every(10).seconds.do(my_job_function)
+
+            while True:
+                simplecron.run_pending()
+
         Args:
             job_func (TypeJobFunction): The function to be executed when the job runs.
             *args: Positional arguments to pass to the job function.
@@ -701,15 +713,6 @@ class Job:
 
         Raises:
             SchedulerNotFoundError: If the job is created without an associated scheduler.
-
-        Example::
-
-            import simplecron
-
-            simplecron.every(10).seconds.do(my_job_function)
-
-            while True:
-                simplecron.run_pending()
         """
         self._job_func = functools.partial(job_func, *args, **kwargs)
         functools.update_wrapper(self._job_func, job_func)
@@ -902,8 +905,9 @@ class Job:
 
         self.was_executed = True
         self.scheduler.providers.notify(
-            self,
-            JobNotificationMessage(
+            job=self,
+            job_message=JobNotificationMessage(
+                job_uuid=str(self.job_uuid),
                 runned_at=str(self.get_current_time),
             ),
         )

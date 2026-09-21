@@ -1,6 +1,9 @@
 class IntervalError(Exception):
     def __init__(self, value: int, expected: str = "greater than 0"):
-        super().__init__(f"Invalid interval: {value}. Interval must be {expected}.")
+        super().__init__(
+            f"Invalid schedule interval: {value}. Interval must be {expected} "
+            "when using units such as 'seconds', 'minutes', 'hours', or 'days'."
+        )
 
 
 class SchedulerNotFoundError(Exception):

@@ -9,11 +9,9 @@ type TypeJob = "Job"
 
 type TypeJobReturn = "Cancel" | None
 
-type TypeJobFunction[T = "Job", R = TypeJobReturn] = Callable[[T], R] | Callable[[T]]
+type TypeJobFunction[T = "Job", R = TypeJobReturn] = Callable[[T], R]
 
-type TypeAsyncJobFunction[T = "Job", R = TypeJobReturn] = Callable[
-    [T], Awaitable[R]
-]
+type TypeAsyncJobFunction[T = "Job", R = TypeJobReturn] = Callable[[T], Awaitable[R]]
 
 type TypeBaseScheduler = "BaseScheduler"
 
