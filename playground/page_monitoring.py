@@ -7,6 +7,7 @@ from simplecron.context import Context
 
 def monitor_page(job: Job, context: Context | None = None, **kwargs):
     page: Page = context.json_data.get("page")
+    page.wait_for_load_state('domcontentloaded')
     if page is not None:
         page.reload()
     logger.info("Page monitored...")
