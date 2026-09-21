@@ -152,11 +152,11 @@ class BaseScheduler:
         listeners = self.event_listeners[utils.EventListenerEnum.AFTER.value]
         self._resolve_listeners([job], *listeners)
 
-    def _cancel_job(self, job: "Job"):
+    def _cancel_job(self, job: "Job", cancel_result: Cancel):
         if job in self._jobs:
             self._jobs.remove(job)
             logger.warning(
-                f"Job cancelled: {job}. Reason: {getattr(job, 'reason', 'No reason provided')}"
+                f"Job cancelled: {job}. Reason: {cancel_result.reason}"
             )
 
     def jobs(self, *tags: str) -> list["Job"]:
