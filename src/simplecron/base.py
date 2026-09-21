@@ -42,7 +42,7 @@ class Cancel:
         cancel_callback: Optional[Callable[["Job"], None]] = None,
     ):
         self.job = job
-        self.reason = reason
+        self.reason = reason or "No reason provided"
 
         if not self.job.is_cancelled:
             self.job.is_cancelled = True
