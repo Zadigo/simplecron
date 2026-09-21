@@ -145,8 +145,9 @@ class BaseScheduler:
 
         result = job.run()
         logger.info(f"Job executed: {job}")
+
         if isinstance(result, Cancel):
-            self._cancel_job(job)
+            self._cancel_job(job, result)
 
         # Resolve event that occurs after the job is run
         listeners = self.event_listeners[utils.EventListenerEnum.AFTER.value]
