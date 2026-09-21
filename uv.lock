@@ -365,8 +365,8 @@ wheels = [
 
 [[package]]
 name = "simplecron"
-version = "0.1.0a1"
-source = { virtual = "." }
+version = "0.1.0a2"
+source = { editable = "." }
 dependencies = [
     { name = "asgiref" },
     { name = "pydantic" },
