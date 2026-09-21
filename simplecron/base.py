@@ -1,6 +1,6 @@
 import datetime
 import functools
-import logging
+import json
 import random
 import uuid
 from collections import defaultdict
@@ -12,21 +12,14 @@ import pytz
 
 from simplecron import exceptions, utils
 from simplecron.context import Context
+from simplecron.providers import JobNotificationMessage, Provider
 from simplecron.typings import (
     TypeDatetimes,
     TypeEventListenerCallback,
     TypeJobFunction,
     TypeJobReturn,
 )
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    handlers=[logging.StreamHandler()],
-)
-
-logger = logging.getLogger("simplecron")
+from simplecron.utils import logger
 
 
 class Cancel:
@@ -105,6 +98,8 @@ class BaseScheduler:
         self._jobs: list["Job"] = []
         self.event_listeners = defaultdict(list[Listener])
         self.context: Context | None = None
+        self.providers = Provider(self)
+        self.scheduler_uuid = uuid.uuid4()
 
         logger.info("Starting Simplecron scheduler...")
 
@@ -116,6 +111,11 @@ class BaseScheduler:
             listener.resolve(jobs)
 
     def _run_job(self, job: "Job"):
+        """Entry point for running a single job.
+
+        Args:
+            job (Job): The job to be executed.
+        """
         # Resolve event that occurs before the job is run
         listeners = self.event_listeners[utils.EventListenerEnum.BEFORE.value]
         self._resolve_listeners([job], *listeners)
@@ -630,7 +630,7 @@ class Job:
             _next_run, restore_time=self.at_time is not None
         )
 
-    def destructure(self) -> dict:
+    def destructure(self, str_json: bool = False) -> dict[str, str] | str:
         """Destructure the job instance into a
         dictionary representation that can be easily serialized."""
         values: dict[str, str] = {}
@@ -639,11 +639,31 @@ class Job:
             if key.startswith("__"):
                 continue
 
+            if callable(value):
+                values[key] = value.__name__
+                continue
+
             if isinstance(value, (datetime.datetime, datetime.time)):
                 values[key] = value.isoformat()
                 continue
 
-            values[key] = value
+            if isinstance(value, BaseScheduler):
+                values[key] = value.__class__.__name__
+                continue
+
+            if key == '_tags':
+                values[key] = ",".join(value)
+                continue
+
+            if value is None:
+                values[key] = ""
+                continue
+
+            values[key] = str(value)
+
+        if str_json:
+            return json.dumps(values)
+
         return values
 
     def tags(self, *tags: str) -> "Job":
@@ -855,6 +875,11 @@ class Job:
         return self
 
     def run(self) -> TypeJobReturn:
+        """Run the job.
+
+        Returns:
+            TypeJobReturn: The result of the job execution or a Cancel instance if the job was cancelled.
+        """
         if self._job_func is None:
             raise ValueError(
                 "No job function assigned. Use the 'do' method to assign a function."
@@ -876,6 +901,12 @@ class Job:
             )
 
         self.was_executed = True
+        self.scheduler.providers.notify(
+            self,
+            JobNotificationMessage(
+                runned_at=str(self.get_current_time),
+            ),
+        )
         return result
 
     # async def async_run(self) -> TypeJobReturn:
