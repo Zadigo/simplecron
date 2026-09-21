@@ -1,0 +1,20 @@
+services:
+  dockerized_simplecron:
+    build: .
+    container_name: dockerized_simplecron
+    restart: always
+    depends_on:
+      - redis
+    networks:
+      - simplecron_network
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    restart: always
+    networks:
+      - simplecron_network
+
+networks:
+  simplecron_network:
+    driver: bridge

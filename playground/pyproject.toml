@@ -1,0 +1,26 @@
+[project]
+name = "testsimplecron"
+version = "0.1.0a1"
+description = "A dockerized version of the simplecron project."
+requires-python = ">=3.14"
+
+dependencies = [
+    "asgiref>=3.11.1",
+    "pydantic>=2.13.4",
+    "pytz>=2026.2",
+    "redis>=8.0.1",
+]
+
+[dependency-groups]
+dev = [
+    "autopep8>=2.3.2",
+    "pytest>=9.1.1",
+    "pytest-aio>=2.1.7",
+    "pytest-cov>=7.1.0",
+    "pytest-crayons>=0.0.9",
+    "pytest-datafiles>=3.0.1",
+    "pytest-env>=1.6.0",
+    "pytest-reportlog>=1.0.0",
+    "ruff>=0.15.20",
+    "schedule>=1.2.2",
+]
