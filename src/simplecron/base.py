@@ -960,41 +960,6 @@ class Job:
         )
         return result
 
-    # async def async_run(self) -> TypeJobReturn:
-    #     if self._job_func is None:
-    #         raise ValueError(
-    #             "No job function assigned. Use the 'do' method to assign a function."
-    #         )
-
-    #     if self._must_cancel():
-    #         return Cancel(
-    #             self, reason=f"Job cancelled after {self.cancel_after.isoformat()}"
-    #         )
-
-    #     aw = self._job_func(self)
-    #     if not inspect.isawaitable(aw):
-    #         raise ValueError(
-    #             "The job function is not awaitable. Use the 'do' method to run a synchronous function."
-    #         )
-
-    #     def done_callback(t: asyncio.Task):
-    #         self.last_run = self.get_current_time
-    #         self._schedule_next_run()
-
-    #         self.was_executed = True
-
-    #     task = asyncio.create_task(aw)
-    #     task.add_done_callback(done_callback)
-
-    #     if self._must_cancel():
-    #         return Cancel(
-    #             self,
-    #             reason=f"Job cancelled after {self.cancel_after.isoformat()}",
-    #             cancel_callback=lambda job: task.cancel(),
-    #         )
-
-    #     return task
-
 
 def every(interval: int, tag: str | None = None) -> Job:
     """Creates a new job instance using the default scheduler. This function
