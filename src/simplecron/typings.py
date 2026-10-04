@@ -1,5 +1,6 @@
 import datetime
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Protocol, Sequence, Union
+from collections.abc import Awaitable, Callable, Sequence
+from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
     from src.simplecron.base import BaseScheduler, Cancel, Job
@@ -10,19 +11,16 @@ type TypeJob = "Job"
 
 type TypeJobReturn = Cancel | None
 
-# type TypeJobFunction[T = "Job", R = TypeJobReturn] = Callable[[T], R]
-
-type TypeAsyncJobFunction[T = "Job", R = TypeJobReturn] = Callable[[T], Awaitable[R]]
-
 type TypeBaseScheduler = "BaseScheduler"
 
 type TypeEventListenerCallback = Callable[[Sequence["Job"]], None]
 
-type TypeDatetimes = Union[datetime.datetime, datetime.time, datetime.timedelta]
+type TypeDatetimes = datetime.datetime | datetime.time | datetime.timedelta
 
+type TypeAsyncJobFunction[T = "Job", R = TypeJobReturn] = Callable[[T], Awaitable[R]]
 
-class JobFunction[T: Job, R: TypeJobReturn](Protocol):
+class JobFunctionProtocol[T: Job, R: TypeJobReturn](Protocol):
     def __call__(self, job: T, context: Context | None = None, **kwargs: Any) -> R: ...
 
 
-type TypeJobFunction[T: Job, R: TypeJobReturn] = JobFunction[T, R]
+type TypeJobFunction[T: Job, R: TypeJobReturn] = JobFunctionProtocol[T, R] | TypeAsyncJobFunction[T, None]
