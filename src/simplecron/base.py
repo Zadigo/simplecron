@@ -6,8 +6,9 @@ import random
 import time
 import uuid
 from collections import defaultdict
+from collections.abc import Callable, Sequence
 from functools import total_ordering
-from typing import Any, Callable, Optional, Sequence
+from typing import Any
 from warnings import warn
 
 import pytz
@@ -37,9 +38,9 @@ class Cancel:
 
     def __init__(
         self,
-        job: "Job",
-        reason: str = None,
-        cancel_callback: Optional[Callable[["Job"], None]] = None,
+        job: Job,
+        reason: str | None = None,
+        cancel_callback: Callable[[Job], None] | None = None,
     ):
         self.job = job
         self.reason = reason or "No reason provided"
@@ -67,8 +68,8 @@ class Listener:
     def __init__(
         self,
         event: str,
-        callback: Callable[["Job" | Sequence["Job"]], None],
-        for_tags: Optional[set[str]] = None,
+        callback: Callable[[Job | Sequence[Job]], None],
+        for_tags: set[str] | None = None,
     ):
         self.event = event
         self.callback = callback
@@ -78,12 +79,12 @@ class Listener:
     def __repr__(self):
         return f"<Listener(event={self.event}, counter={self.counter})>"
 
-    def __eq__(self, other: "Listener"):
+    def __eq__(self, other: Listener):
         if not isinstance(other, Listener):
             return NotImplemented
         return self.event == other.event and self.callback == other.callback
 
-    def resolve(self, jobs: Sequence["Job"]):
+    def resolve(self, jobs: Sequence[Job]):
         try:
             if self.event == utils.EventListenerEnum.BEFORE_ALL.value:
                 self.callback(jobs)
@@ -116,7 +117,7 @@ class BaseScheduler:
     def __init__(self):
         logger.info(f"Initializing Simplecron {self.__class__.__name__} scheduler...")
 
-        self._jobs: list["Job"] = []
+        self._jobs: list[Job] = []
         self.event_listeners = defaultdict(list[Listener])
         self.context: Context | None = None
         self.providers = Provider(self)
@@ -129,11 +130,11 @@ class BaseScheduler:
     def __repr__(self):
         return f"<BaseScheduler(jobs={len(self._jobs)})>"
 
-    def _resolve_listeners(self, jobs: Sequence["Job"], *listeners: Listener):
+    def _resolve_listeners(self, jobs: Sequence[Job], *listeners: Listener):
         for listener in listeners:
             listener.resolve(jobs)
 
-    def _run_job(self, job: "Job"):
+    def _run_job(self, job: Job):
         """Entry point for running a single job.
 
         Args:
@@ -153,19 +154,17 @@ class BaseScheduler:
         listeners = self.event_listeners[utils.EventListenerEnum.AFTER.value]
         self._resolve_listeners([job], *listeners)
 
-    def _cancel_job(self, job: "Job", cancel_result: Cancel):
+    def _cancel_job(self, job: Job, cancel_result: Cancel):
         if job in self._jobs:
             self._jobs.remove(job)
-            logger.warning(
-                f"Job cancelled: {job}. Reason: {cancel_result.reason}"
-            )
+            logger.warning(f"Job cancelled: {job}. Reason: {cancel_result.reason}")
 
-    def jobs(self, *tags: str) -> list["Job"]:
+    def jobs(self, *tags: str) -> list[Job]:
         if tags:
             return list(filter(lambda job: job.has_tags(*tags), self._jobs))
         return self._jobs
 
-    def run_pending(self, context: dict[str, Any] = None):
+    def run_pending(self, context: dict[str, Any] | None = None):
         """Run all jobs that are scheduled to run at the current time."""
         if context is not None:
             self.base_context.json_data = self.base_context.json_data or {}
@@ -188,13 +187,13 @@ class BaseScheduler:
         """Clear all scheduled jobs."""
         self._jobs.clear()
 
-    def create_every(self, interval: int, tag: str = None) -> "Job":
+    def create_every(self, interval: int, tag: str | None = None) -> Job:
         job = Job(interval, self)
         if tag:
             job._tags.add(tag)
         return job
 
-    def get_next_run(self, tag: str = None) -> Optional[datetime.datetime]:
+    def get_next_run(self, tag: str | None = None) -> datetime.datetime | None:
         if not self._jobs:
             return None
 
@@ -219,7 +218,7 @@ class BaseScheduler:
         self,
         event: utils.EventListenerEnum,
         callback: TypeEventListenerCallback,
-        for_tags: Optional[Sequence[str]] = None,
+        for_tags: Sequence[str] | None = None,
     ):
         """Attaches a callback function to a specific event listener. There are three types of event listeners available:
 
@@ -260,7 +259,7 @@ class BaseScheduler:
     def before_events(
         self,
         callbacks: Sequence[TypeEventListenerCallback],
-        for_tags: Optional[Sequence[str]] = None,
+        for_tags: Sequence[str] | None = None,
     ):
         """Attach multiple callback functions to the BEFORE event listener.
 
@@ -273,7 +272,7 @@ class BaseScheduler:
     def after_events(
         self,
         callbacks: Sequence[TypeEventListenerCallback],
-        for_tags: Optional[Sequence[str]] = None,
+        for_tags: Sequence[str] | None = None,
     ):
         """Attach multiple callback functions to the AFTER event listener.
 
@@ -327,7 +326,7 @@ class Job:
 
     label_template = "every {interval} {unit} at {at_time}"
 
-    def __init__(self, interval: int, scheduler: Optional[BaseScheduler] = None):
+    def __init__(self, interval: int, scheduler: BaseScheduler | None = None):
         # The interval in seconds at which the job should run.
         self.interval = interval
         # The scheduler instance to which the job belongs. If not provided, the default scheduler will be used.
@@ -336,24 +335,24 @@ class Job:
         # It can be a callable or a Job instance.
         self._job_func: TypeJobFunction = None
         # The latest time at which the job should run (if specified)
-        self.latest: Optional[datetime.time] = None
+        self.latest: datetime.time | None = None
 
         # The unit of time for the job's interval (e.g., seconds, minutes, hours)
-        self.unit: Optional[str] = None
+        self.unit: str | None = None
         # Time at which the job should run (if specified)
-        self.at_time: Optional[datetime.time] = None
+        self.at_time: datetime.time | None = None
         # An optional timezone for the job's scheduled time
-        self.at_timezone: Optional[datetime.timezone] = None
+        self.at_timezone: datetime.timezone | None = None
         # Datetime of the last time the job was run
-        self.last_run: Optional[datetime.datetime] = None
+        self.last_run: datetime.datetime | None = None
         # The next scheduled run time for the job
-        self.next_run: Optional[datetime.datetime] = None
+        self.next_run: datetime.datetime | None = None
         # If specified, the weekday on which the job should run
         # (for example when using "every week on tuesday",
         # the start day would be "tuesday")
-        self.start_day: Optional[str] = None
+        self.start_day: str | None = None
         # Optional time of final run
-        self.cancel_after: Optional[datetime.datetime] = None
+        self.cancel_after: datetime.datetime | None = None
 
         self._tags: set[str] = set()
         # Unique identifier for the job, used for tracking and management
@@ -367,12 +366,12 @@ class Job:
     def __repr__(self):
         return f"<Job([{self._get_label(as_slug=True)}], next_run={self.next_run})>"
 
-    def __lt__(self, other: "Job"):
+    def __lt__(self, other: Job):
         if not isinstance(other, Job):
             return NotImplemented
         return self.next_run < other.next_run
 
-    def __eq__(self, other: "Job"):
+    def __eq__(self, other: Job):
         if not isinstance(other, Job):
             return NotImplemented
         return self.next_run == other.next_run
@@ -389,7 +388,7 @@ class Job:
     @property
     def get_timezone(self) -> datetime.timezone:
         """Get the timezone of the job or UTC if no timezone is set."""
-        self.at_timezone = self.at_timezone or datetime.timezone.utc
+        self.at_timezone = self.at_timezone or datetime.UTC
         return self.at_timezone
 
     @property
@@ -399,115 +398,115 @@ class Job:
 
         # Determine the timezone to use for comparison. If the job has a specific
         # timezone set, use that; otherwise, default to UTC.
-        timezone = self.next_run.tzinfo or self.at_timezone or datetime.timezone.utc
+        timezone = self.next_run.tzinfo or self.at_timezone or datetime.UTC
         return datetime.datetime.now(timezone) >= self.next_run
 
     @property
-    def second(self) -> "Job":
+    def second(self) -> Job:
         if self.interval != 1:
             raise exceptions.IntervalError(self.interval, expected="equal to 1")
         return self.seconds
 
     @property
-    def seconds(self) -> "Job":
+    def seconds(self) -> Job:
         self.unit = utils.TimeUnit.SECONDS.value
         return self
 
     @property
-    def minute(self) -> "Job":
+    def minute(self) -> Job:
         if self.interval != 1:
             raise exceptions.IntervalError(self.interval, expected="equal to 1")
         return self.minutes
 
     @property
-    def minutes(self) -> "Job":
+    def minutes(self) -> Job:
         self.unit = utils.TimeUnit.MINUTES.value
         return self
 
     @property
-    def hour(self) -> "Job":
+    def hour(self) -> Job:
         if self.interval != 1:
             raise exceptions.IntervalError(self.interval, expected="equal to 1")
         return self.hours
 
     @property
-    def hours(self) -> "Job":
+    def hours(self) -> Job:
         self.unit = utils.TimeUnit.HOURS.value
         return self
 
     @property
-    def day(self) -> "Job":
+    def day(self) -> Job:
         if self.interval != 1:
             raise exceptions.IntervalError(self.interval, expected="equal to 1")
         return self.days
 
     @property
-    def days(self) -> "Job":
+    def days(self) -> Job:
         self.unit = utils.TimeUnit.DAYS.value
         return self
 
     @property
-    def week(self) -> "Job":
+    def week(self) -> Job:
         if self.interval != 1:
             raise exceptions.IntervalError(self.interval, expected="equal to 1")
         return self.weeks
 
     @property
-    def weeks(self) -> "Job":
+    def weeks(self) -> Job:
         self.unit = utils.TimeUnit.WEEKS.value
         return self
 
     @property
-    def monday(self) -> "Job":
+    def monday(self) -> Job:
         if self.interval != 1:
             raise exceptions.IntervalError(self.interval, expected="equal to 1")
         self.start_day = "monday"
         return self.weeks
 
     @property
-    def tuesday(self) -> "Job":
+    def tuesday(self) -> Job:
         if self.interval != 1:
             raise exceptions.IntervalError(self.interval, expected="equal to 1")
         self.start_day = "tuesday"
         return self.weeks
 
     @property
-    def wednesday(self) -> "Job":
+    def wednesday(self) -> Job:
         if self.interval != 1:
             raise exceptions.IntervalError(self.interval, expected="equal to 1")
         self.start_day = "wednesday"
         return self.weeks
 
     @property
-    def thursday(self) -> "Job":
+    def thursday(self) -> Job:
         if self.interval != 1:
             raise exceptions.IntervalError(self.interval, expected="equal to 1")
         self.start_day = "thursday"
         return self.weeks
 
     @property
-    def friday(self) -> "Job":
+    def friday(self) -> Job:
         if self.interval != 1:
             raise exceptions.IntervalError(self.interval, expected="equal to 1")
         self.start_day = "friday"
         return self.weeks
 
     @property
-    def saturday(self) -> "Job":
+    def saturday(self) -> Job:
         if self.interval != 1:
             raise exceptions.IntervalError(self.interval, expected="equal to 1")
         self.start_day = "saturday"
         return self.weeks
 
     @property
-    def sunday(self) -> "Job":
+    def sunday(self) -> Job:
         if self.interval != 1:
             raise exceptions.IntervalError(self.interval, expected="equal to 1")
         self.start_day = "sunday"
         return self.weeks
 
     @classmethod
-    def build_from_dict(cls, data: dict) -> "Job":
+    def build_from_dict(cls, data: dict) -> Job:
         """Reconstruct a Job instance from a dictionary representation.
 
         Args:
@@ -708,7 +707,7 @@ class Job:
 
         return values
 
-    def tags(self, *tags: str) -> "Job":
+    def tags(self, *tags: str) -> Job:
         """Add tags to the job for categorization and filtering."""
         for tag in tags:
             if not isinstance(tag, str):
@@ -730,7 +729,7 @@ class Job:
         matching_tags = self._tags.intersection(tags_to_check)
         return bool(matching_tags)
 
-    def do(self, job_func: TypeJobFunction, *args, **kwargs) -> "Job":
+    def do(self, job_func: TypeJobFunction, *args, **kwargs) -> Job:
         """Assign a function to be executed when the job runs
 
         ## Examples
@@ -800,8 +799,8 @@ class Job:
     def at(
         self,
         using: datetime.time,
-        timezone: Optional[datetime.timezone | pytz.BaseTzInfo] = None,
-    ) -> "Job":
+        timezone: datetime.timezone | pytz.BaseTzInfo | None = None,
+    ) -> Job:
         """Set a time at which the job should run.
 
         ## Example
@@ -860,9 +859,9 @@ class Job:
                 )
             self.at_timezone = timezone
 
-        hour: Optional[int] = None
-        minute: Optional[int] = None
-        second: Optional[int] = None
+        hour: int | None = None
+        minute: int | None = None
+        second: int | None = None
 
         # Every minute when the second is X.
         # E.g. 10:15:30, 10:16:30, 10:17:30
@@ -888,7 +887,7 @@ class Job:
         self.at_time = datetime.time(hour=hour, minute=minute, second=second)
         return self
 
-    def until(self, limit: TypeDatetimes) -> "Job":
+    def until(self, limit: TypeDatetimes) -> Job:
         """Set a limit for the job's execution, after which it will be cancelled.
 
         Args:
@@ -997,7 +996,7 @@ class Job:
     #     return task
 
 
-def every(interval: int, tag: Optional[str] = None) -> Job:
+def every(interval: int, tag: str | None = None) -> Job:
     """Creates a new job instance using the default scheduler. This function
     is a convenient way to create jobs without needing to directly interact
     with the scheduler.
@@ -1012,7 +1011,7 @@ def every(interval: int, tag: Optional[str] = None) -> Job:
     return default_scheduler.create_every(interval, tag)
 
 
-def run_pending(context: dict[str, Any] = None):
+def run_pending(context: dict[str, Any] | None = None):
     """Run all jobs created in the default scheduler."""
     default_scheduler.run_pending(context=context)
 
