@@ -764,38 +764,6 @@ class Job:
         logger.info("Job scheduled to start at %s", self.next_run)
         return self
 
-    # async def async_do(self, job_func: TypeAsyncJobFunction, *args, **kwargs) -> "Job":
-    #     """Assign an asynchronous function to be executed when the job runs.
-
-    #     Args:
-    #         job_func (TypeAsyncJobFunction): The asynchronous function to be executed when the job runs.
-    #         *args: Positional arguments to pass to the job function.
-    #         **kwargs: Keyword arguments to pass to the job function.
-
-    #     Returns:
-    #         Job: The current Job instance, allowing for method chaining.
-
-    #     Raises:
-    #         SchedulerNotFoundError: If the job is created without an associated scheduler.
-
-    #     Example::
-
-    #         import simplecron
-
-    #         simplecron.every(10).seconds.async_do(my_async_job_function)
-
-    #         while True:
-    #             simplecron.run_pending()
-    #     """
-    #     self._job_func = functools.partial(job_func, *args, **kwargs)
-    #     functools.update_wrapper(self._job_func, job_func)
-
-    #     if self.scheduler is None:
-    #         raise exceptions.SchedulerNotFoundError()
-
-    #     self.scheduler._jobs.append(self)
-    #     return self
-
     def at(
         self,
         using: datetime.time,
