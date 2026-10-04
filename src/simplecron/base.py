@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import functools
 import inspect
@@ -362,6 +363,8 @@ class Job:
         self.is_cancelled = False
         # Indicates whether the job has been executed. If True, the job has already run at least once.
         self.was_executed = False
+        # Indicates whether the job function is asynchronous
+        self.async_job = False
 
     def __repr__(self):
         return f"<Job([{self._get_label(as_slug=True)}], next_run={self.next_run})>"
