@@ -1,11 +1,12 @@
 import json
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from typing import Any
 
 import pydantic
 from pydantic import Field
-from redis import Redis
+from redis import ConnectionError, Redis
 
 from src.simplecron.typings import TypeBaseScheduler, TypeJob
 from src.simplecron.utils import logger
@@ -14,6 +15,8 @@ from src.simplecron.utils import logger
 class JobNotificationMessage(pydantic.BaseModel):
     job_uuid: str = Field(...)
     runned_at: str = Field(...)
+    error: str | None = Field(default=None)
+    success: bool | None = Field(default=None)
 
 
 class ProviderSavedData(pydantic.BaseModel):
@@ -49,7 +52,7 @@ class BaseProvider(ABC):
 
 
 class Provider(BaseProvider):
-    observers: list[Observer] = []
+    observers: Sequence[Observer] = []
 
     def attach(self, observer: Observer) -> None:
         self.observers.append(observer)
@@ -68,7 +71,6 @@ class Provider(BaseProvider):
 
     def initialize(self) -> None:
         """Initialize the provider. This method can be used to set up any necessary resources or connections."""
-        pass
 
 
 class Observer(ABC):
@@ -106,12 +108,27 @@ class RedisDatabase(Observer):
     ) -> None:
         super().__init__()
         self.conn = Redis(host=host, port=port, db=0, **kwargs)
-        self.storage_key = f"simplecron:{self.uuid}"
 
         try:
             self.conn.ping()
-        except Exception as e:
+        except ConnectionError as e:
             logger.error(f"Error connecting to Redis: {e}")
+
+    @property
+    def storage_key(self) -> str:
+        return f"simplecron:{self.uuid}"
+
+    @property
+    def storage_key_details(self) -> str:
+        return f"{self.storage_key}:details"
+
+    @property
+    def storage_key_runs(self) -> str:
+        return f"{self.storage_key}:runs"
+
+    @property
+    def storage_key_messages(self) -> str:
+        return f"{self.storage_key}:messages"
 
     def update(
         self,
@@ -131,10 +148,14 @@ class RedisDatabase(Observer):
                 last_sender=str(job_message.job_uuid) if bool(job_message) else "",
             )
 
-            self.conn.hset(
-                self.storage_key + ":details", mapping=run_details.model_dump()
-            )
-            self.conn.lpush(
-                self.storage_key + ":runs", json.dumps(run_details.model_dump())
-            )
-            self.conn.publish(str(self.uuid), json.dumps(run_details.model_dump()))
+            json_details = run_details.model_dump()
+            str_json_details = json.dumps(json_details)
+
+            self.conn.hset(self.storage_key_details, mapping=json_details)
+            self.conn.lpush(self.storage_key_runs, str_json_details)
+            self.conn.publish(str(self.uuid), str_json_details)
+
+            if bool(job_message):
+                self.conn.lpush(
+                    self.storage_key_messages, json.dumps(job_message.model_dump())
+                )

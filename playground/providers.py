@@ -5,7 +5,7 @@ from src.simplecron.base import Job, logger
 from src.simplecron.providers import RedisDatabase
 
 
-def executor(job: Job):
+def executor(job: Job, **kwargs):
     logger.warning("Executor called")
 
 

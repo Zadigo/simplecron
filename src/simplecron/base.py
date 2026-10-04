@@ -25,6 +25,8 @@ from src.simplecron.typings import (
 )
 from src.simplecron.utils import logger
 
+_background_tasks: set[asyncio.Task[Any]] = set()
+
 
 class Cancel:
     """A class representing a cancellation signal for jobs.
@@ -51,6 +53,16 @@ class Cancel:
 
         if cancel_callback is not None:
             cancel_callback(self.job)
+
+        self.job.scheduler.providers.notify(
+            job=self.job,
+            job_message=JobNotificationMessage(
+                job_uuid=self.job.get_uuid,
+                runned_at=self.job.get_current_time_as_string,
+                error="Job was cancelled by user",
+                success=False,
+            ),
+        )
 
 
 class Listener:
@@ -389,6 +401,11 @@ class Job:
         return datetime.datetime.now(self.get_timezone)
 
     @property
+    def get_current_time_as_string(self) -> str:
+        """Get the current time as a string in the job's timezone or UTC if no timezone is set."""
+        return str(self.get_current_time)
+
+    @property
     def get_timezone(self) -> datetime.timezone:
         """Get the timezone of the job or UTC if no timezone is set."""
         self.at_timezone = self.at_timezone or datetime.UTC
@@ -514,11 +531,18 @@ class Job:
 
         Args:
             data (dict): A dictionary containing the job's attributes.
+
+        Returns:
+            Job: The reconstructed Job instance.
         """
         interval = data.pop("interval")
         job = cls(interval)
         job.__dict__.update(data)
         return job
+
+    @property
+    def get_uuid(self) -> str:
+        return str(self.job_uuid)
 
     def _must_cancel(self) -> bool:
         """Determine if the job should be cancelled based on its 'cancel_after' attribute.
@@ -674,6 +698,61 @@ class Job:
             _next_run, restore_time=self.at_time is not None
         )
 
+    def _on_async_done(self, task: asyncio.Task[Any]) -> None:
+        """Handle the completion of an asynchronous job.
+
+        This method is called when an asynchronous task associated with the job is done.
+        It removes the task from the background tasks set, checks for cancellation or exceptions,
+        and triggers post-execution actions if the task completed successfully.
+
+        Args:
+            task (asyncio.Task[Any]): The asynchronous task that has completed.
+        """
+        _background_tasks.discard(task)
+
+        if task.cancelled():
+            self.scheduler.providers.notify(
+                job=self,
+                job_message=JobNotificationMessage(
+                    job_uuid=str(self.job_uuid),
+                    runned_at=self.get_current_time_as_string,
+                    error="Job was cancelled",
+                    success=False,
+                ),
+            )
+            return
+
+        if (exc := task.exception()) is not None:
+            logger.error("Job %s failed", self.job_uuid, exc_info=exc)
+            self.scheduler.providers.notify(
+                job=self,
+                job_message=JobNotificationMessage(
+                    job_uuid=self.get_uuid,
+                    runned_at=self.get_current_time_as_string,
+                    error=str(exc),
+                    success=False,
+                ),
+            )
+            return
+
+        self._after_execution()
+
+    def _after_execution(self) -> None:
+        """This method is called after the job has finished running, either
+        successfully or after handling any exceptions. It updates the
+        job's execution status and notifies the scheduler's providers.
+        """
+        self.was_executed = True
+        self.scheduler.providers.notify(
+            job=self,
+            job_message=JobNotificationMessage(
+                job_uuid=self.get_uuid,
+                runned_at=self.get_current_time_as_string,
+                error=None,
+                success=True,
+            ),
+        )
+
     def destructure(self, str_json: bool = False) -> dict[str, str] | str:
         """Destructure the job instance into a
         dictionary representation that can be easily serialized."""
@@ -756,6 +835,10 @@ class Job:
         Raises:
             SchedulerNotFoundError: If the job is created without an associated scheduler.
         """
+        inspect.signature(job_func).bind(self, context=None)
+        self._job_func = job_func
+        self.async_job = inspect.iscoroutinefunction(job_func)
+
         self._job_func = functools.partial(job_func, *args, **kwargs)
         functools.update_wrapper(self._job_func, job_func)
         self._schedule_next_run()
@@ -903,33 +986,69 @@ class Job:
                 self, reason=f"Job cancelled after {self.cancel_after.isoformat()}"
             )
 
-        signature = inspect.signature(self._job_func)
-        accepts_kwargs = any(
-            p.kind == inspect.Parameter.VAR_KEYWORD
-            for p in signature.parameters.values()
-        )
-        if not accepts_kwargs:
-            raise ValueError("The job function must accept **kwargs.")
-
-        result = self._job_func(self, context=self.scheduler.base_context)
+        loop: asyncio.AbstractEventLoop | None = None
+        if self.async_job:
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                raise RuntimeError(
+                    "Async job triggered outside a running event loop. "
+                    "Call run_pending() from within asyncio.run(...)."
+                ) from None
 
         self.last_run = self.get_current_time
-        self._schedule_next_run()
+        result: Any = None
+
+        try:
+            if loop is not None:
+                task = loop.create_task(
+                    self._job_func(self, context=self.scheduler.base_context),
+                    name=f"simplecron-{self.job_uuid}",
+                )
+                _background_tasks.add(task)
+                task.add_done_callback(self._on_async_done)
+                result = task
+            else:
+                result = self._job_func(self, context=self.scheduler.base_context)
+                self._after_execution()
+        finally:
+            # Advance the schedule even if a sync job raised,
+            # otherwise it re-triggers on every tick
+            self._schedule_next_run()
 
         if self._must_cancel():
             return Cancel(
                 self, reason=f"Job cancelled after {self.cancel_after.isoformat()}"
             )
-
-        self.was_executed = True
-        self.scheduler.providers.notify(
-            job=self,
-            job_message=JobNotificationMessage(
-                job_uuid=str(self.job_uuid),
-                runned_at=str(self.get_current_time),
-            ),
-        )
         return result
+
+        # signature = inspect.signature(self._job_func)
+        # accepts_kwargs = any(
+        #     p.kind == inspect.Parameter.VAR_KEYWORD
+        #     for p in signature.parameters.values()
+        # )
+        # if not accepts_kwargs:
+        #     raise ValueError("The job function must accept **kwargs.")
+
+        # result = self._job_func(self, context=self.scheduler.base_context)
+
+        # self.last_run = self.get_current_time
+        # self._schedule_next_run()
+
+        # if self._must_cancel():
+        #     return Cancel(
+        #         self, reason=f"Job cancelled after {self.cancel_after.isoformat()}"
+        #     )
+
+        # self.was_executed = True
+        # self.scheduler.providers.notify(
+        #     job=self,
+        #     job_message=JobNotificationMessage(
+        #         job_uuid=str(self.job_uuid),
+        #         runned_at=str(self.get_current_time),
+        #     ),
+        # )
+        # return result
 
 
 def every(interval: int, tag: str | None = None) -> Job:
