@@ -1,15 +1,17 @@
 import asyncio
 
-from simplecron.base import default_scheduler
+from simplecron import base
 
 
-async def some_function():
+async def some_function(*args, **kwargs):
     print("Executed!")
 
 
 async def main():
-    default_scheduler.(some_function, "interval", seconds=5)
-    await default_scheduler.start()
+    base.every(5).seconds.do(some_function)
+    while True:
+        base.run_pending()
+        await asyncio.sleep(1)
 
 
 if __name__ == "__main__":
