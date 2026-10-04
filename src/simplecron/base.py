@@ -729,7 +729,7 @@ class Job:
         matching_tags = self._tags.intersection(tags_to_check)
         return bool(matching_tags)
 
-    def do(self, job_func: TypeJobFunction, *args, **kwargs) -> Job:
+    def do(self, job_func: TypeJobFunction, *args: Any, **kwargs: Any) -> Job:
         """Assign a function to be executed when the job runs
 
         ## Examples
