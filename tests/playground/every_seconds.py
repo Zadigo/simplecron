@@ -1,9 +1,9 @@
 import time
 
 import pytz
-from src.simplecron import utils
-from src.simplecron.base import Cancel
-from src.simplecron import base
+
+from simplecron import base, utils
+from simplecron.base import Cancel
 
 
 def some_func(job: base.Job, *args, **kwargs):
@@ -15,10 +15,7 @@ def after_func(job: base.Job, *args, **kwargs):
     print("* After function executed!", "\n")
 
 
-base.default_scheduler.with_event_listener(
-    utils.EventListenerEnum.AFTER,
-    after_func
-)
+base.default_scheduler.with_event_listener(utils.EventListenerEnum.AFTER, after_func)
 
 job = base.every(10).seconds.do(some_func)
 job.at_timezone = pytz.timezone("Europe/Paris")

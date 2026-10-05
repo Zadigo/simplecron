@@ -2,9 +2,8 @@ import datetime
 
 import pytest
 
-from src.simplecron.base import Job
-from src.simplecron.utils import TimeUnit
-from src.simplecron.base import BaseScheduler
+from simplecron.base import BaseScheduler, Job
+from simplecron.utils import TimeUnit
 
 
 def callback(job: Job):
@@ -64,7 +63,7 @@ def test_hours(scheduler):
 
 
 class TestDaily:
-    """Daily jobs are jobs that will run every day, 
+    """Daily jobs are jobs that will run every day,
     at the time the job was created."""
 
     @pytest.fixture(autouse=True)
@@ -89,7 +88,7 @@ class TestDaily:
 
 class TestWeekly:
     """Weekly jobs are jobs that will run every week,
-    using the day of the week at the time the job was created. 
+    using the day of the week at the time the job was created.
     If created at 14:30 on a Monday, it will run every
     Monday at 14:30."""
 
@@ -124,7 +123,7 @@ class TestWeekly:
         sunday = self.scheduler.create_every(1).sunday.do(callback)
 
         current_date = datetime.datetime.now()
-        days = (7 - current_date.weekday())
+        days = 7 - current_date.weekday()
         next_monday = current_date + datetime.timedelta(days=days)
         assert monday.next_run.date() == next_monday.date()
 

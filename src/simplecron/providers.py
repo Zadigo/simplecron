@@ -8,8 +8,8 @@ import pydantic
 from pydantic import Field
 from redis import ConnectionError, Redis
 
-from src.simplecron.typings import TypeBaseScheduler, TypeJob
-from src.simplecron.utils import logger
+from simplecron.typings import TypeBaseScheduler, TypeJob
+from simplecron.utils import logger
 
 
 class JobNotificationMessage(pydantic.BaseModel):

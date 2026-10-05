@@ -1,7 +1,8 @@
 import asyncio
 
 from simplecron.runners import Schedulers
-from src.simplecron.base import BaseScheduler, Job, TimeUnit
+
+from simplecron.base import BaseScheduler, Job, TimeUnit
 
 runner = Schedulers()
 

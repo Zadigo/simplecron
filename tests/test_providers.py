@@ -3,8 +3,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.simplecron.base import BaseScheduler, Job
-from src.simplecron.providers import JobNotificationMessage, Provider, RedisDatabase
+from simplecron.base import BaseScheduler, Job
+from simplecron.providers import JobNotificationMessage, Provider, RedisDatabase
 
 
 @pytest.fixture

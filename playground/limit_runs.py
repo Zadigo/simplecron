@@ -1,6 +1,6 @@
+from simplecron import base
+from simplecron.base import Job, logger
 from simplecron.context import Context
-from src.simplecron import base
-from src.simplecron.base import Job, logger
 
 
 def executor(job: Job, context: Context | None = None, **kwargs):

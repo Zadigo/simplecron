@@ -1,11 +1,12 @@
 import datetime
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from enum import Enum
-from typing import Callable, Optional, Self
+from typing import Self
 
 import pytz
 
-from src.simplecron import utils
+from simplecron import utils
 
 
 class TimeUnit(Enum):
@@ -23,16 +24,16 @@ type TypeTimezone = datetime.timezone | pytz.BaseTzInfo
 class TBaseSchedule(ABC):
     def __init__(
         self,
-        tjob: "TJob",
+        tjob: TJob,
         unit: TimeUnit,
         interval: int,
-        timezone: Optional[TypeTimezone] = None,
+        timezone: TypeTimezone | None = None,
     ):
-        self.tjob: "TJob" = tjob
+        self.tjob: TJob = tjob
         self.unit: TimeUnit = unit
         self.interval: int = interval
-        self.timezone: Optional[TypeTimezone] = timezone or datetime.timezone.utc
-        self.at_time: Optional[datetime.time] = None
+        self.timezone: TypeTimezone | None = timezone or datetime.UTC
+        self.at_time: datetime.time | None = None
 
         if interval > 1 and (unit == TimeUnit.MONTHS or unit == TimeUnit.WEEKS):
             raise ValueError("Single schedules must have an interval of 1.")
@@ -42,7 +43,7 @@ class TBaseSchedule(ABC):
         pass
 
     @abstractmethod
-    def do(self, job_func: Callable[[], None]) -> "TJob":
+    def do(self, job_func: Callable[[], None]) -> TJob:
         pass
 
     def _move_to_at_time(self, dt: datetime.datetime) -> datetime.datetime:
@@ -63,16 +64,16 @@ class TBaseSchedule(ABC):
 
 
 class TBaseScheduleMixin[T = TBaseSchedule]:
-    def do(self: T, job_func: Callable[[], None]) -> "TJob":
+    def do(self: T, job_func: Callable[[], None]) -> TJob:
         return self.tjob
 
 
 class TMonthly(TBaseSchedule):
-    def __init__(self, job: "TJob", unit: TimeUnit, *args, **kwargs):
+    def __init__(self, job: TJob, unit: TimeUnit, *args, **kwargs):
         super().__init__(job, unit, *args, **kwargs)
         self.start_month: str = None
 
-    def do(self, job_func: Callable[[], None]) -> "TJob":
+    def do(self, job_func: Callable[[], None]) -> TJob:
         self.schedule_next_run()
         return self.tjob
 
@@ -90,17 +91,17 @@ class TMonthly(TBaseSchedule):
 
 
 class TDaily(TBaseSchedule):
-    def __init__(self, job: "TJob", unit: TimeUnit, *args, **kwargs):
+    def __init__(self, job: TJob, unit: TimeUnit, *args, **kwargs):
         super().__init__(job, unit, *args, **kwargs)
         self.start_day: str = None
         self.unit: TimeUnit = unit
 
-    def do(self, job_func: Callable[[], None]) -> "TJob":
+    def do(self, job_func: Callable[[], None]) -> TJob:
         self.schedule_next_run()
         return self.tjob
 
     def at(
-        self, using: H, timezone: Optional[datetime.timezone | pytz.BaseTzInfo] = None
+        self, using: H, timezone: datetime.timezone | pytz.BaseTzInfo | None = None
     ) -> Self:
         if timezone is None:
             self.timezone = timezone
@@ -146,12 +147,12 @@ class TScheduler:
 
 
 class TJob:
-    def __init__(self, interval: int = 1, scheduler: Optional[TScheduler] = None):
+    def __init__(self, interval: int = 1, scheduler: TScheduler | None = None):
         self.interval = interval
-        self.at_timezone: Optional[TypeTimezone] = None
-        self.next_run: Optional[datetime.datetime] = None
-        self.scheduler: Optional[TScheduler] = scheduler
-        self.schedule: Optional[TBaseSchedule] = None
+        self.at_timezone: TypeTimezone | None = None
+        self.next_run: datetime.datetime | None = None
+        self.scheduler: TScheduler | None = scheduler
+        self.schedule: TBaseSchedule | None = None
 
     @property
     def month(self) -> TMonthly:
@@ -225,23 +226,17 @@ class H:
         self.minute = minute
         self.second = second or 0
         self.unit: TimeUnit = None
-        self.timezone: Optional[TypeTimezone] = None
-        self.at_time: Optional[datetime.time] = None
+        self.timezone: TypeTimezone | None = None
+        self.at_time: datetime.time | None = None
 
     def __repr__(self):
         match self.unit:
             case TimeUnit.MINUTES:
-                return "H(<Every minute past {second:02d} seconds>)".format(
-                    second=self.second,
-                )
+                return f"H(<Every minute past {self.second:02d} seconds>)"
             case TimeUnit.HOURS:
-                return "H(<Every hour past {minute:02d} minutes>)".format(
-                    minute=self.minute,
-                )
+                return f"H(<Every hour past {self.minute:02d} minutes>)"
             case TimeUnit.DAYS | TimeUnit.WEEKS:
-                return "H(<Every day at {hour:02d}:{minute:02d}:{second:02d}>)".format(
-                    hour=self.hour, minute=self.minute, second=self.second
-                )
+                return f"H(<Every day at {self.hour:02d}:{self.minute:02d}:{self.second:02d}>)"
             case _:
                 return (
                     "H(<Every {unit} at {hour:02d}:{minute:02d}:{second:02d}>)".format(
@@ -252,11 +247,11 @@ class H:
                     )
                 )
 
-    def resolve(self, timezone: Optional[TypeTimezone] = None):
+    def resolve(self, timezone: TypeTimezone | None = None):
         if self.unit is None:
             raise ValueError("Time unit is not set.")
 
-        self.timezone = timezone or datetime.timezone.utc
+        self.timezone = timezone or datetime.UTC
 
         params = {"second": self.second, "microsecond": 0}
 

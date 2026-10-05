@@ -5,15 +5,14 @@ import time
 import pytest
 import pytz
 
-from src.simplecron import utils
-from src.simplecron.base import BaseScheduler, Cancel, Job
+from simplecron import utils
+from simplecron.base import BaseScheduler, Cancel, Job
 
 
 async def async_executor(job: Job):
     """An async executor function that runs the job's function."""
     print(f"Executing job: {job._get_label()}")
     await asyncio.sleep(0.1)  # Simulate some async work
-    return None
 
 
 def executor(job: Job):

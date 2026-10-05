@@ -4,8 +4,8 @@ from collections.abc import Awaitable, Callable, Sequence
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
-    from src.simplecron.base import BaseScheduler, Cancel, Job
-    from src.simplecron.context import Context
+    from simplecron.base import BaseScheduler, Cancel, Job
+    from simplecron.context import Context
 
 
 type TypeJob = "Job"

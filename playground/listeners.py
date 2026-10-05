@@ -1,6 +1,6 @@
 import time
 
-from src.simplecron.base import Job, default_scheduler, logger
+from simplecron.base import Job, default_scheduler, logger
 
 
 def executor(job: Job):

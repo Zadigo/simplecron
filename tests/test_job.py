@@ -3,9 +3,9 @@ import datetime
 import pytest
 import pytz
 
-from src.simplecron import exceptions
-from src.simplecron.base import BaseScheduler, Job
-from src.simplecron.utils import TimeUnit
+from simplecron import exceptions
+from simplecron.base import BaseScheduler, Job
+from simplecron.utils import TimeUnit
 
 
 @pytest.fixture
@@ -15,7 +15,7 @@ def interval_fixture():
 
 @pytest.fixture
 def date_fixture():
-    return datetime.datetime(2024, 6, 1, 12, 0, tzinfo=datetime.timezone.utc)
+    return datetime.datetime(2024, 6, 1, 12, 0, tzinfo=datetime.UTC)
 
 
 @pytest.fixture
@@ -31,27 +31,21 @@ def test_move_to_at_time(interval_fixture, date_fixture):
         {
             "value": date_fixture,
             "at_time": datetime.time(15, 30),
-            "expected": datetime.datetime(
-                2024, 6, 1, 12, 0, tzinfo=datetime.timezone.utc
-            ),
+            "expected": datetime.datetime(2024, 6, 1, 12, 0, tzinfo=datetime.UTC),
             "note": "Expect original value when at_time is set and unit is None",
             "unit": None,
         },
         {
             "value": date_fixture,
             "at_time": datetime.time(15, 30),
-            "expected": datetime.datetime(
-                2024, 6, 1, 12, 30, tzinfo=datetime.timezone.utc
-            ),
+            "expected": datetime.datetime(2024, 6, 1, 12, 30, tzinfo=datetime.UTC),
             "note": "Expect value moved to at_time when unit is set to HOURS e.g. 12:00 -> 12:30",
             "unit": TimeUnit.HOURS.value,
         },
         {
             "value": date_fixture,
             "at_time": datetime.time(15, 30),
-            "expected": datetime.datetime(
-                2024, 6, 1, 15, 30, tzinfo=datetime.timezone.utc
-            ),
+            "expected": datetime.datetime(2024, 6, 1, 15, 30, tzinfo=datetime.UTC),
             "note": "Expect value moved to at_time when unit is set to DAYS e.g. 12:00 -> 15:30",
             "unit": TimeUnit.DAYS.value,
         },
@@ -91,13 +85,13 @@ def test_utc_offset_correction(interval_fixture, date_fixture, date_fixture_offs
             "value": datetime.datetime(
                 **{
                     **params,
-                    "tzinfo": datetime.timezone.utc,
+                    "tzinfo": datetime.UTC,
                 }
             ),
             "expected": datetime.datetime(
                 **{
                     **params,
-                    "tzinfo": datetime.timezone.utc,
+                    "tzinfo": datetime.UTC,
                 }
             ),
             "note": "No offset change expected for UTC time",

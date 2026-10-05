@@ -1,8 +1,8 @@
 import time
 
-from src.simplecron import base
-from src.simplecron.base import Job, logger
-from src.simplecron.providers import RedisDatabase
+from simplecron import base
+from simplecron.base import Job, logger
+from simplecron.providers import RedisDatabase
 
 
 def executor(job: Job, **kwargs):

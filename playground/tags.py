@@ -1,7 +1,7 @@
 import time
 
-from src.simplecron.base import Job, default_scheduler, logger
-from src.simplecron.utils import EventListenerEnum
+from simplecron.base import Job, default_scheduler, logger
+from simplecron.utils import EventListenerEnum
 
 
 def executor(job: Job):
