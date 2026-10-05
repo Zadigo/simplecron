@@ -1,17 +1,18 @@
 import asyncio
 import json
-from collections.abc import Sequence
+from typing import Any
 
 import httpx2
 import redis
 
 from simplecron import base
-from simplecron.context import Context
-from simplecron.utils import EventListenerEnum, logger
+from simplecron.utils import logger
 
-_responses: asyncio.Queue[dict] = asyncio.Queue()
+_responses: asyncio.Queue[dict | Any] = asyncio.Queue()
 
 _active_tasks: dict[str, asyncio.Task] = {}
+
+_request_tasks: set[asyncio.Task] = set()
 
 
 def get_redis() -> redis.Redis:
@@ -26,16 +27,32 @@ def get_redis() -> redis.Redis:
     return instance
 
 
-def _save_response_done(task: asyncio.Task):
+async def request(page: int = 1) -> dict:
+    async with asyncio.Semaphore(8), httpx2.AsyncClient() as client:
+        url = (
+            f"https://recherche-entreprises.api.gouv.fr/search?q=carrefour&page={page}"
+        )
+        response = await client.get(url)
+        response.raise_for_status()
+        data = response.json()
+
+        await _responses.put(data)
+
+        logger.info(f"Request to {data['page']} succeeded")
+        return data
+
+
+def _done_callback(task: asyncio.Task):
     if task.cancelled():
-        logger.warning("Save response task was cancelled")
+        logger.warning(f"{task.get_name()} response task was cancelled")
         return
 
     if (e := task.exception()) is not None:
-        logger.error(f"Save response task failed with exception: {e}")
+        logger.error(f"{task.get_name()} task failed with exception: {e}")
         return
 
-    logger.info("Save response task completed")
+    _request_tasks.discard(task)
+    logger.info(f"{task.get_name()} task completed")
 
 
 async def save_response(cancel: asyncio.Event):
@@ -54,51 +71,29 @@ async def save_response(cancel: asyncio.Event):
         #     await asyncio.wait_for(cancel.wait(), timeout=1)
 
 
-async def request(url: str) -> dict:
-    async with httpx2.AsyncClient() as client:
-        response = await client.get(url)
-        response.raise_for_status()
-        data = response.json()
-        logger.info(f"Request to {data['page']} succeeded")
-        return data
-
-
 async def fetch_data(job: base.Job, **kwargs):
-    async with asyncio.Lock():
-        stop_event: asyncio.Event | None = job.get_base_context.get_value("stop_event")
-        url: str = job.get_base_context.get_value("url")
+    async with asyncio.TaskGroup() as tg:
+        for _ in range(10):
+            job.get_base_context.decrement_value("current_page")
 
-        data = await request(url)
+            page = job.get_base_context.get_value("current_page")
+            if page == 0:
+                stop_event: asyncio.Event = job.get_base_context.get_value("stop_event")
+                if stop_event is not None:
+                    for task in _active_tasks.values():
+                        task.cancel("Global loop reached")
+                    stop_event.clear()
 
-        current_page = job.get_base_context.get_value("current_page")
-        total_pages = job.get_base_context.get_value("total_pages")
-        logger.info(f"Current page: {current_page}, Total pages: {total_pages}")
+            task = tg.create_task(request(page), name="Request")
 
-        if stop_event is not None and current_page <= 0:
-            stop_event.clear()
-        else:
-            await _responses.put(data)
-            logger.info(f"Successfully saved response for page {data['page']} page")
+            _request_tasks.add(task)
+
+            task.add_done_callback(_done_callback)
+            await asyncio.sleep(3)
 
 
 async def scheduler_loop(total_pages: int):
-    def decrement_current_page(job: base.Job | Sequence[base.Job]):
-        if not isinstance(job, (Sequence)):
-            context = job.get_base_context.decrement_value("current_page")
-
-            current_page = context.json_data.get("current_page")
-            url = f"https://recherche-entreprises.api.gouv.fr/search?q=carrefour&page={current_page}"
-            context.set_value("url", url)
-
-            logger.info("Next page decremented")
-
-    base.default_scheduler.with_event_listener(
-        EventListenerEnum.AFTER, decrement_current_page
-    )
-
-    url = "https://recherche-entreprises.api.gouv.fr/search?q=carrefour&page=1"
-    base.default_scheduler.with_context(Context(json_data={"url": url}))
-    base.every(10).seconds.do(fetch_data)
+    base.every(60).seconds.do(fetch_data)
 
     await base.async_start_blocking(
         context={"current_page": total_pages, "total_pages": total_pages}
@@ -110,17 +105,16 @@ async def main():
 
     global_event: asyncio.Event = asyncio.Event()
 
-    url = "https://recherche-entreprises.api.gouv.fr/search?q=carrefour&page=1"
-    data = await request(url)
+    data = await request()
 
     async with asyncio.TaskGroup() as tg:
-        t1 = tg.create_task(save_response(global_event))
-        t2 = tg.create_task(scheduler_loop(data["total_pages"]))
-
-        t1.add_done_callback(_save_response_done)
-        t2.add_done_callback(_save_response_done)
+        t1 = tg.create_task(save_response(global_event), name="SaveResponse")
+        t2 = tg.create_task(scheduler_loop(data["total_pages"]), name="SchedulerLoop")
 
         global_event.set()
+
+        t1.add_done_callback(_done_callback)
+        t2.add_done_callback(_done_callback)
 
         _active_tasks["save_response"] = t1
         _active_tasks["scheduler_loop"] = t2
