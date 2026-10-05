@@ -66,6 +66,12 @@ class Cancel:
         )
 
 
+class Skipped:
+    def __init__(self, job: Job):
+        self.job = job
+        self.reason = "Job was skipped"
+
+
 class Listener:
     """A class representing an event listener for a specific job event.
     It wraps a callback function that is triggered on specific job events.
@@ -145,14 +151,18 @@ class BaseScheduler:
         return f"<BaseScheduler(jobs={len(self._jobs)})>"
 
     async def _shutdown(self):
-        """Shut down all background tasks."""
+        """Shut down all background tasks when the scheduler
+        is run in an asynchronous context."""
         tasks = list(_background_tasks)
         for t in tasks:
             t.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
 
     def _stop(self) -> None:
-        self._stop_event.set()
+        """Stop the scheduler by setting the stop event."""
+        stop_event: asyncio.Event | None = self.base_context.json_data.get("stop_event")
+        if stop_event is not None:
+            stop_event.set()
 
     def _resolve_listeners(self, jobs: Sequence[Job], *listeners: Listener):
         for listener in listeners:
@@ -346,6 +356,9 @@ class Job:
         job_uuid (uuid.UUID): A unique identifier for the job, used for tracking and management.
         is_cancelled (bool): A flag indicating whether the job has been cancelled.
         was_executed (bool): A flag indicating whether the job has been executed at least once.
+        max_runs (Optional[int]): The maximum number of times the job is allowed to run.
+        is_async_job (bool): A flag indicating whether the job is asynchronous.
+        allow_overlap (bool): A flag indicating whether overlapping executions of the job are allowed.
     """
 
     label_template = "every {interval} {unit} at {at_time}"
@@ -386,11 +399,16 @@ class Job:
         self.is_cancelled = False
         # Indicates whether the job has been executed. If True, the job has already run at least once.
         self.was_executed = False
+
         # The maximum number of times the job is allowed to run. If None, there is no limit.
         self.max_runs: int | None = None
 
         # Indicates whether the job function is asynchronous
         self.is_async_job = False
+        # The asyncio task associated with the job if it is asynchronous.
+        self._task: asyncio.Task[Any] | None = None
+        # Indicates whether the job is allowed to overlap with itself if it is asynchronous.
+        self.allow_overlap: bool = False
 
     def __repr__(self):
         return f"<Job([{self._get_label(as_slug=True)}], next_run={self.next_run})>"
@@ -557,6 +575,10 @@ class Job:
     @property
     def get_uuid(self) -> str:
         return str(self.job_uuid)
+
+    @property
+    def is_busy(self) -> bool:
+        return self._task is not None and not self._task.done()
 
     def _must_cancel(self) -> bool:
         """Determine if the job should be cancelled based on its 'cancel_after' attribute.
@@ -1022,6 +1044,13 @@ class Job:
 
         try:
             if loop is not None:
+                # Prevents overlapping async job executions
+                if self.is_busy and not self.allow_overlap:
+                    logger.debug(
+                        "Job %s skipped: previous run still in progress", self.job_uuid
+                    )
+                    return Skipped(self)
+
                 task = loop.create_task(
                     self._job_func(self, context=self.scheduler.base_context),
                     name=f"simplecron-{self.job_uuid}",
@@ -1030,6 +1059,7 @@ class Job:
                 task.add_done_callback(self._on_async_done)
                 result = task
             else:
+                # Handles synchronous job execution
                 result = self._job_func(self, context=self.scheduler.base_context)
                 self._after_execution()
         finally:
@@ -1042,34 +1072,6 @@ class Job:
                 self, reason=f"Job cancelled after {self.cancel_after.isoformat()}"
             )
         return result
-
-        # signature = inspect.signature(self._job_func)
-        # accepts_kwargs = any(
-        #     p.kind == inspect.Parameter.VAR_KEYWORD
-        #     for p in signature.parameters.values()
-        # )
-        # if not accepts_kwargs:
-        #     raise ValueError("The job function must accept **kwargs.")
-
-        # result = self._job_func(self, context=self.scheduler.base_context)
-
-        # self.last_run = self.get_current_time
-        # self._schedule_next_run()
-
-        # if self._must_cancel():
-        #     return Cancel(
-        #         self, reason=f"Job cancelled after {self.cancel_after.isoformat()}"
-        #     )
-
-        # self.was_executed = True
-        # self.scheduler.providers.notify(
-        #     job=self,
-        #     job_message=JobNotificationMessage(
-        #         job_uuid=str(self.job_uuid),
-        #         runned_at=str(self.get_current_time),
-        #     ),
-        # )
-        # return result
 
     def with_limited_runs(self, max_runs: int):
         """Limit the number of times this job can run.
@@ -1121,8 +1123,8 @@ async def async_start_blocking(context: dict | None = None) -> None:
         while not _stop_event.is_set():
             default_scheduler.run_pending(context=context)
             with contextlib.suppress(TimeoutError):
-                # Waits for the stop event to be called within the 
-                # specified timeout (1 second). If not, it will raise a TimeoutError 
+                # Waits for the stop event to be called within the
+                # specified timeout (1 second). If not, it will raise a TimeoutError
                 # which is suppressed and runs the loop again.
                 await asyncio.wait_for(_stop_event.wait(), timeout=1.0)
 
