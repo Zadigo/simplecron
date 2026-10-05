@@ -15,7 +15,7 @@ type TypeEventListenerCallback = Callable[[Job | Sequence["Job"]], None]
 
 type TypeDatetimes = datetime.datetime | datetime.time | datetime.timedelta
 
-type TypeJobReturn = Cancel | Skipped | asyncio.Task[Any]
+type TypeJobReturn = Cancel | Skipped | asyncio.Task[Any] | None
 
 
 class AsyncJobFunctionProtocol(Protocol):
@@ -39,4 +39,4 @@ class JobFunctionProtocol(Protocol):
     ) -> TypeJobReturn: ...
 
 
-type TypeJobFunction = JobFunctionProtocol | AsyncJobFunctionProtocol
+type TypeJobFunction = JobFunctionProtocol | AsyncJobFunctionProtocol | None

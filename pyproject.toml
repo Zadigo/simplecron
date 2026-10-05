@@ -65,7 +65,7 @@ Repository = "https://github.com/Zadigo/simplecron.git"
 Changelog = "https://github.com/Zadigo/simplecron/blob/main/CHANGELOG.md"
 
 [tool.pyright]
-typeCheckingMode = "off"
+typeCheckingMode = "basic"
 reportMissingImports = true
 reportUntypedBaseClass = true
 

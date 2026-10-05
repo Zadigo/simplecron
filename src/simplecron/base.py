@@ -58,15 +58,16 @@ class Cancel:
         if cancel_callback is not None:
             cancel_callback(self.job)
 
-        self.job.scheduler.providers.notify(
-            job=self.job,
-            job_message=JobNotificationMessage(
-                job_uuid=self.job.get_uuid,
-                runned_at=self.job.get_current_time_as_string,
-                error="Job was cancelled by user",
-                success=False,
-            ),
-        )
+        if bool(self.job.scheduler):
+            self.job.scheduler.providers.notify(
+                job=self.job,
+                job_message=JobNotificationMessage(
+                    job_uuid=self.job.get_uuid,
+                    runned_at=self.job.get_current_time_as_string,
+                    error="Job was cancelled by user",
+                    success=False,
+                ),
+            )
 
 
 class Skipped:
@@ -414,15 +415,20 @@ class Job:
         self.allow_overlap: bool = False
 
     def __repr__(self):
-        humanized_time = self.next_run.strftime(HUMAN_DATE_FORMAT)
+        humanized_time: str | None = None
+
+        if self.next_run is not None:
+            humanized_time = self.next_run.strftime(HUMAN_DATE_FORMAT)
         return f"<Job: {self._get_label(as_slug=True)}, next_run: {humanized_time}>"
 
-    def __lt__(self, other: Job):
+    def __lt__(self, other: Job | Any):
         if not isinstance(other, Job):
-            return NotImplemented
-        return self.next_run < other.next_run
+            return NotImplementedError
+        return (
+            bool(other.next_run) and bool(self.next_run)
+        ) and self.next_run < other.next_run
 
-    def __eq__(self, other: Job):
+    def __eq__(self, other: Job | Any):
         if not isinstance(other, Job):
             return NotImplemented
         return self.next_run == other.next_run
@@ -448,7 +454,7 @@ class Job:
         return str(self.get_current_time)
 
     @property
-    def get_timezone(self) -> datetime.timezone:
+    def get_timezone(self) -> datetime.timezone | pytz.BaseTzInfo:
         """Get the timezone of the job or UTC if no timezone is set."""
         self.at_timezone = self.at_timezone or datetime.UTC
         return self.at_timezone
@@ -689,7 +695,7 @@ class Job:
         if self.at_timezone is None:
             raise ValueError("at_timezone must be set for UTC offset correction.")
 
-        # Check if the this local time actually valid.
+        # Check if the local time is actually valid.
         # If not move it to the closest valid time (DST Gap)
         # For example, if 02:23 does not exist (because DST
         # moves from 02:00 to 03:00), this will schedule the job at 03:23.
@@ -756,29 +762,36 @@ class Job:
         """
         _background_tasks.discard(task)
 
+        template = {
+            'job_uuid': str(self.job_uuid),
+            'runned_at': self.get_current_time_as_string,
+        }
+
         if task.cancelled():
-            self.scheduler.providers.notify(
-                job=self,
-                job_message=JobNotificationMessage(
-                    job_uuid=str(self.job_uuid),
-                    runned_at=self.get_current_time_as_string,
-                    error="Job was cancelled",
-                    success=False,
-                ),
-            )
+            logger.warning("Task canelled")
+            if bool(self.scheduler):
+                self.scheduler.providers.notify(
+                    job=self,
+                    job_message=JobNotificationMessage(
+                        **template,
+                        error="Job was cancelled",
+                        success=False,
+                    ),
+                )
             return
 
         if (exc := task.exception()) is not None:
             logger.error("Job %s failed", self.job_uuid, exc_info=exc)
-            self.scheduler.providers.notify(
-                job=self,
-                job_message=JobNotificationMessage(
-                    job_uuid=self.get_uuid,
-                    runned_at=self.get_current_time_as_string,
-                    error=str(exc),
-                    success=False,
-                ),
-            )
+
+            if bool(self.scheduler):
+                self.scheduler.providers.notify(
+                    job=self,
+                    job_message=JobNotificationMessage(
+                        **template,
+                        error=str(exc),
+                        success=False,
+                    ),
+                )
             return
 
         self._after_execution()
@@ -789,6 +802,10 @@ class Job:
         job's execution status and notifies the scheduler's providers.
         """
         self.was_executed = True
+
+        if not bool(self.scheduler):
+            raise TypeError("Job is being run outside of a scheduler")
+
         self.scheduler.providers.notify(
             job=self,
             job_message=JobNotificationMessage(
@@ -801,6 +818,7 @@ class Job:
 
         if self.max_runs is not None:
             self.max_runs -= 1
+
             if self.max_runs <= 0:
                 self.scheduler._cancel_job(
                     self, Cancel(self, reason="Reached maximum allowed runs")
@@ -864,9 +882,7 @@ class Job:
         matching_tags = self._tags.intersection(tags_to_check)
         return bool(matching_tags)
 
-    def do(
-        self, job_func: TypeJobFunction, *context_args: Any, **context_kwargs: Any
-    ) -> Job:
+    def do(self, job_func: TypeJobFunction, *func_args: Any, **func_kwargs: Any) -> Job:
         """Assign a function to be executed when the job runs
 
         ## Examples
@@ -881,8 +897,8 @@ class Job:
 
         Args:
             job_func (TypeJobFunction): The function to be executed when the job runs.
-            *context_args: Positional arguments to pass to the job function.
-            **context_kwargs: Keyword arguments to pass to the job function.
+            *func_args: Positional arguments to pass to the job function.
+            **func_kwargs: Keyword arguments to pass to the job function.
 
         Returns:
             Job: The current Job instance, allowing for method chaining.
@@ -894,7 +910,7 @@ class Job:
         self._job_func = job_func
         self.is_async_job = inspect.iscoroutinefunction(job_func)
 
-        self._job_func = functools.partial(job_func, *context_args, **context_kwargs)
+        self._job_func = functools.partial(job_func, *func_args, **func_kwargs)
         functools.update_wrapper(self._job_func, job_func)
         self._schedule_next_run()
 

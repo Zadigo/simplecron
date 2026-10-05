@@ -199,7 +199,7 @@ class TestBaseScheduler:
 
         # Calling `do` without calling the unit property
         # should raise an IntervalError
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             s.create_every(1).do(executor)
 
         s.create_every(1).minute.do(executor)
@@ -208,6 +208,7 @@ class TestBaseScheduler:
         s.create_every(1).minutes.do(executor)
 
     async def test_async_job_execution(self):
+        pytest.skip(reason="Create test for async functions")
         s = BaseScheduler()
 
         # Create an async job

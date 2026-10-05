@@ -6,11 +6,16 @@ from pydantic import Field
 
 class Context(pydantic.BaseModel):
     scheduler_uuid: str | None = Field(default=None)
-    json_data: dict[str, Any] | None = Field(default_factory=dict)
+    json_data: dict[str, Any] = Field(default_factory=dict)
 
     def _check_json_data(self):
         if self.json_data is None:
             self.json_data = {}
+
+    def _check_increment(self, key: str):
+        self._check_json_data()
+        if key not in self.json_data or not isinstance(self.json_data[key], int):
+            self.json_data[key] = 0
 
     def model_dump(self, **kwargs):
         for key, value in self.json_data.items():
@@ -19,13 +24,11 @@ class Context(pydantic.BaseModel):
         return super().model_dump(**kwargs)
 
     def reset_value(self, key: str):
-        self._check_json_data()
         if key in self.json_data:
             self.json_data[key] = None
         return self
 
     def reset_all(self):
-        self._check_json_data()
         for key in self.json_data:
             self.json_data[key] = None
         return self
@@ -40,20 +43,12 @@ class Context(pydantic.BaseModel):
         return self
 
     def increment_value(self, key: str, amount: int = 1):
-        self._check_json_data()
-
-        if key not in self.json_data or not isinstance(self.json_data[key], int):
-            self.json_data[key] = 0
-
+        self._check_increment(key)
         self.json_data[key] += amount
         return self
 
     def decrement_value(self, key: str, amount: int = 1):
-        self._check_json_data()
-
-        if key not in self.json_data or not isinstance(self.json_data[key], int):
-            self.json_data[key] = 0
-
+        self._check_increment(key)
         self.json_data[key] -= amount
         return self
 
@@ -63,5 +58,4 @@ class Context(pydantic.BaseModel):
         return self
 
     def get_value(self, key: str) -> Any:
-        self._check_json_data()
         return self.json_data.get(key)

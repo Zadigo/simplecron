@@ -64,35 +64,36 @@ async def request(url: str) -> dict:
 
 
 async def fetch_data(job: base.Job, **kwargs):
-    stop_event: asyncio.Event | None = job.get_base_context.get_value("stop_event")
-    url: str = job.get_base_context.get_value("url")
+    async with asyncio.Lock():
+        stop_event: asyncio.Event | None = job.get_base_context.get_value("stop_event")
+        url: str = job.get_base_context.get_value("url")
 
-    data = await request(url)
+        data = await request(url)
 
-    next_page = job.get_base_context.get_value("next_page")
-    total_pages = job.get_base_context.get_value("total_pages")
-    logger.info(f"Current page: {next_page}, Total pages: {total_pages}")
+        current_page = job.get_base_context.get_value("current_page")
+        total_pages = job.get_base_context.get_value("total_pages")
+        logger.info(f"Current page: {current_page}, Total pages: {total_pages}")
 
-    if stop_event is not None and next_page <= 0:
-        stop_event.clear()
-    else:
-        await _responses.put(data)
-        logger.info(f"Successfully saved response for page {data['page']} page")
+        if stop_event is not None and current_page <= 0:
+            stop_event.clear()
+        else:
+            await _responses.put(data)
+            logger.info(f"Successfully saved response for page {data['page']} page")
 
 
 async def scheduler_loop(total_pages: int):
-    def decrement_next_page(job: base.Job | Sequence[base.Job]):
-        if not isinstance(job, list):
-            context = job.get_base_context.decrement_value("next_page")
+    def decrement_current_page(job: base.Job | Sequence[base.Job]):
+        if not isinstance(job, (Sequence)):
+            context = job.get_base_context.decrement_value("current_page")
 
-            next_page = context.json_data.get("next_page")
-            url = f"https://recherche-entreprises.api.gouv.fr/search?q=carrefour&page={next_page}"
+            current_page = context.json_data.get("current_page")
+            url = f"https://recherche-entreprises.api.gouv.fr/search?q=carrefour&page={current_page}"
             context.set_value("url", url)
 
             logger.info("Next page decremented")
 
     base.default_scheduler.with_event_listener(
-        EventListenerEnum.AFTER, decrement_next_page
+        EventListenerEnum.AFTER, decrement_current_page
     )
 
     url = "https://recherche-entreprises.api.gouv.fr/search?q=carrefour&page=1"
@@ -100,7 +101,7 @@ async def scheduler_loop(total_pages: int):
     base.every(10).seconds.do(fetch_data)
 
     await base.async_start_blocking(
-        context={"next_page": total_pages, "total_pages": total_pages}
+        context={"current_page": total_pages, "total_pages": total_pages}
     )
 
 

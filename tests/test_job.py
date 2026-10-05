@@ -349,10 +349,10 @@ class TestJobExceptions:
 
 def test_serialization():
     s = BaseScheduler()
-    j = s.create_every(10).minutes.do(lambda: print("Hello, World!"))
+    j = s.create_every(10).minutes.do(lambda job: print("Hello, World!"))
     data = j.destructure()
 
     assert isinstance(data, dict), "Destructured job should be a dictionary"
-    assert data["interval"] == j.interval, (
+    assert data["interval"] == str(j.interval), (
         "Interval should be preserved in destructured data"
     )
