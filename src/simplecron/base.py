@@ -5,6 +5,7 @@ import functools
 import inspect
 import json
 import random
+from sys import exception
 import time
 import uuid
 from collections import defaultdict
@@ -110,9 +111,9 @@ class Listener:
                 self.callback(jobs)
             else:
                 for job in jobs:
-                    if self.for_tags is not None:
-                        if not job.has_tags(*list(self.for_tags)):
-                            continue
+                    has_tags = job.has_tags(*list(self.for_tags))
+                    if self.for_tags is not None and not has_tags:
+                        continue
                     self.callback(job)
         except Exception as e:
             # Catch any exceptions created by the user
@@ -183,10 +184,10 @@ class BaseScheduler:
 
         if isinstance(result, Cancel):
             self._cancel_job(job, result)
-
-        # Resolve event that occurs after the job is run
-        listeners = self.event_listeners[utils.EventListenerEnum.AFTER.value]
-        self._resolve_listeners([job], *listeners)
+        else:
+            # Resolve event that occurs after the job is run
+            listeners = self.event_listeners[utils.EventListenerEnum.AFTER.value]
+            self._resolve_listeners([job], *listeners)
 
     def _cancel_job(self, job: Job, cancel_result: Cancel):
         if job in self._jobs:
