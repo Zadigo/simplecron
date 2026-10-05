@@ -140,14 +140,14 @@ from simplecron.utils import EventListenerEnum
 default_scheduler.event_listener(EventListenerEnum.BEFORE_ALL, lambda scheduler: print("Before all jobs"))
 ```
 
-The same can be achieved using the shortcut method `before_all_events`, `after_events`, and `before_events`:
+The same can be achieved using the shortcut method `before_all_events`, `after_events`, and `before_events` in order to attach multiple event listeners to the scheduler:
 
 ```python
 from simplecron.base import default_scheduler
 
-default_scheduler.before_all_events(lambda scheduler: print("Before all jobs"))
-default_scheduler.before_events(lambda job: print("Before job:", job))
-default_scheduler.after_events(lambda job: print("After job:", job))
+default_scheduler.before_all_events([lambda scheduler: print("Before all jobs")])
+default_scheduler.before_events([lambda job: print("Before job:", job)])
+default_scheduler.after_events([lambda job: print("After job:", job)])
 ```
 
 ## Jobs

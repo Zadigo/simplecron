@@ -11,10 +11,9 @@ def executor(job: Job):
     logger.info("Executor called")
 
 
-delta = datetime.datetime.now(tz=pytz.timezone("Europe/Paris")) + datetime.timedelta(
-    minutes=2
-)
-base.every(5).days.at(delta.time()).do(executor)
+timezone = pytz.timezone("Europe/Paris")
+
+base.every(1).hour.at(datetime.time(second=30), timezone=timezone).do(executor)
 
 
 if __name__ == "__main__":

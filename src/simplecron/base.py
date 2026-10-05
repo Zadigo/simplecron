@@ -7,10 +7,11 @@ import json
 import random
 import time
 import uuid
+import warnings
 from collections import defaultdict
 from collections.abc import Callable, Sequence
 from functools import total_ordering
-from typing import Any
+from typing import Any, Self
 from warnings import warn
 
 import pytz
@@ -25,6 +26,8 @@ from simplecron.typings import (
     TypeJobReturn,
 )
 from simplecron.utils import logger
+
+HUMAN_DATE_FORMAT: str = "%b. %d %Y, %H:%M:%S.%f (%I:%M:%S.%f %p) (%Z)"
 
 _background_tasks: set[asyncio.Task[TypeJobReturn]] = set()
 
@@ -379,7 +382,7 @@ class Job:
         # Time at which the job should run (if specified)
         self.at_time: datetime.time | None = None
         # An optional timezone for the job's scheduled time
-        self.at_timezone: datetime.timezone | None = None
+        self.at_timezone: datetime.timezone | pytz.BaseTzInfo | None = None
         # Datetime of the last time the job was run
         self.last_run: datetime.datetime | None = None
         # The next scheduled run time for the job
@@ -411,7 +414,8 @@ class Job:
         self.allow_overlap: bool = False
 
     def __repr__(self):
-        return f"<Job([{self._get_label(as_slug=True)}], next_run={self.next_run})>"
+        humanized_time = self.next_run.strftime(HUMAN_DATE_FORMAT)
+        return f"<Job: {self._get_label(as_slug=True)}, next_run: {humanized_time}>"
 
     def __lt__(self, other: Job):
         if not isinstance(other, Job):
@@ -714,7 +718,7 @@ class Job:
 
         # Get the current time in the specified timezone,
         # or UTC if no timezone is set
-        current_time = datetime.datetime.now(self.get_timezone)
+        current_time = datetime.datetime.now(tz=self.get_timezone)
         _next_run = current_time
 
         if self.start_day is not None:
@@ -860,7 +864,9 @@ class Job:
         matching_tags = self._tags.intersection(tags_to_check)
         return bool(matching_tags)
 
-    def do(self, job_func: TypeJobFunction, *args: Any, **kwargs: Any) -> Job:
+    def do(
+        self, job_func: TypeJobFunction, *context_args: Any, **context_kwargs: Any
+    ) -> Job:
         """Assign a function to be executed when the job runs
 
         ## Examples
@@ -875,8 +881,8 @@ class Job:
 
         Args:
             job_func (TypeJobFunction): The function to be executed when the job runs.
-            *args: Positional arguments to pass to the job function.
-            **kwargs: Keyword arguments to pass to the job function.
+            *context_args: Positional arguments to pass to the job function.
+            **context_kwargs: Keyword arguments to pass to the job function.
 
         Returns:
             Job: The current Job instance, allowing for method chaining.
@@ -888,7 +894,7 @@ class Job:
         self._job_func = job_func
         self.is_async_job = inspect.iscoroutinefunction(job_func)
 
-        self._job_func = functools.partial(job_func, *args, **kwargs)
+        self._job_func = functools.partial(job_func, *context_args, **context_kwargs)
         functools.update_wrapper(self._job_func, job_func)
         self._schedule_next_run()
 
@@ -896,7 +902,9 @@ class Job:
             raise exceptions.SchedulerNotFoundError()
 
         self.scheduler._jobs.append(self)
-        logger.info("Job scheduled to start at %s", self.next_run)
+
+        humanized_time = self.next_run.strftime(HUMAN_DATE_FORMAT)
+        logger.info("Job scheduled to start on %s", humanized_time)
         return self
 
     def at(
@@ -1079,21 +1087,29 @@ class Job:
             )
         return result
 
-    def with_limited_runs(self, max_runs: int):
+    def with_limited_runs(self, max_runs: int) -> Self:
         """Limit the number of times this job can run.
 
         Args:
             max_runs (int): The maximum number of times the job is allowed to run.
 
         Returns:
-            Job: The current job instance with the run limit applied.
+            Self: The current job instance with the run limit applied.
         """
         self.max_runs = max_runs
+        return self
 
+    def with_timezone(self, timezone: pytz.BaseTzInfo) -> Self:
+        """Set the timezone for this job.
 
-def once(callback: TypeJobFunction):
-    job = default_scheduler.create_every(1).do(callback)
-    job.with_limited_runs(1)
+        Args:
+            timezone (pytz.BaseTzInfo): The timezone to associate with the job.
+
+        Returns:
+            Self: The current job instance with the timezone applied.
+        """
+        self.at_timezone = timezone
+        return self
 
 
 def every(interval: int, tag: str | None = None) -> Job:
@@ -1118,6 +1134,13 @@ def run_pending(context: dict[str, Any] | None = None):
 
 def start_blocking(**kwargs: Any):
     """Start the default scheduler in a blocking loop."""
+    for job in default_scheduler.jobs():
+        if job.is_async_job:
+            warnings.warn(
+                f"Job {job} is asynchronous and should be run with async_start_blocking. "
+                "The job will not be executed correctly otherwise."
+            )
+
     while True:
         default_scheduler.run_pending(**kwargs)
         time.sleep(1)

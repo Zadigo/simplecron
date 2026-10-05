@@ -10,8 +10,9 @@ def executor(job: Job, **kwargs):
 
 
 base.default_scheduler.providers.attach(RedisDatabase())
-base.every(15).seconds.do(executor)
-base.every(30).seconds.do(executor)
+
+base.every(10).seconds.do(executor)
+base.every(60).seconds.do(executor)
 
 if __name__ == "__main__":
     while True:

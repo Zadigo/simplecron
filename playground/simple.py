@@ -2,11 +2,10 @@ import time
 
 from simplecron import base
 from simplecron.base import Job, logger
-from simplecron.context import Context
 
 
-def executor(job: Job, context: Context | None = None, **kwargs):
-    logger.info(f"Executor called with context: {context.json_data}")
+def executor(job: Job):
+    logger.info(f"Executor called with context: {job.get_base_context.json_data}")
 
 
 def before_callback(job: Job):

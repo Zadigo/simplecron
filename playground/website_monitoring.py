@@ -4,25 +4,25 @@ from playwright.async_api import Page, async_playwright
 
 from simplecron import base
 from simplecron.base import Job, logger
-from simplecron.context import Context
 
 page_lock = asyncio.Lock()
 
 
-async def monitor_page(job: Job, context: Context | None = None, **kwargs):
+async def monitor_page(job: Job, **kwargs):
     async with page_lock:
-        if context is not None:
-            page: Page = context.json_data.get("page")
-            
-            if page is not None:
-                await page.query_selector("h1")
-            
-            logger.info("Page monitored...")
+        page: Page = job.get_base_context.get_value("page")
+        if page is not None:
+            title_handle = await page.query_selector("title")
+            if title_handle is not None:
+                title = await title_handle.text_content()
+                logger.info(f"Page title: {title}")
 
 
 async def main():
     async with async_playwright() as p:
-        base.every(10).seconds.do(monitor_page)
+        job = base.every(10).seconds.do(monitor_page)
+        job.with_limited_runs(3)
+
         browser = await p.chromium.launch(headless=False)
         page = await browser.new_page()
 

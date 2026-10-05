@@ -15,7 +15,7 @@ def after_callback(job: Job):
     logger.info("After callback called")
 
 
-default_scheduler.every(15).seconds.do(executor)
+default_scheduler.create_every(15).seconds.do(executor)
 default_scheduler.before_events([before_callback])
 default_scheduler.after_events([after_callback])
 
