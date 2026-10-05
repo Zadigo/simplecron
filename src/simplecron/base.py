@@ -26,7 +26,7 @@ from simplecron.typings import (
 )
 from simplecron.utils import logger
 
-_background_tasks: set[asyncio.Task[Any]] = set()
+_background_tasks: set[asyncio.Task[TypeJobReturn]] = set()
 
 
 class Cancel:

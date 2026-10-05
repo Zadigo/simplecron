@@ -4,7 +4,7 @@ from collections.abc import Awaitable, Callable, Sequence
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
-    from simplecron.base import BaseScheduler, Cancel, Job
+    from simplecron.base import BaseScheduler, Cancel, Job, Skipped
     from simplecron.context import Context
 
 
@@ -16,13 +16,29 @@ type TypeEventListenerCallback = Callable[[Sequence["Job"]], None]
 
 type TypeDatetimes = datetime.datetime | datetime.time | datetime.timedelta
 
-type TypeJobReturn = Any | Cancel | asyncio.Task[Any]
+type TypeJobReturn = Cancel | Skipped | asyncio.Task[Any]
 
-type TypeAsyncJobFunction[T = "Job", R = TypeJobReturn] = Callable[[T], Awaitable[R]]
+class AsyncJobFunctionProtocol(Protocol):
+    async def __call__(
+        self,
+        job: Job,
+        *,
+        context: Context | None = None,
+        stop_event: asyncio.Event | None = None,
+        **kwargs: Any,
+    ) -> Awaitable[TypeJobReturn]: ...
 
 
-class JobFunctionProtocol[T: Job, R: TypeJobReturn](Protocol):
-    def __call__(self, job: T, context: Context | None = None, **kwargs: Any) -> R: ...
+type TypeAsyncJobFunction = AsyncJobFunctionProtocol
+
+class JobFunctionProtocol(Protocol):
+    def __call__(
+        self,
+        job: Job,
+        *,
+        context: Context | None = None,
+        **kwargs: Any,
+    ) -> TypeJobReturn: ...
 
 
-type TypeJobFunction[T: Job, R: TypeJobReturn] = JobFunctionProtocol[T, R]
+type TypeJobFunction = JobFunctionProtocol | AsyncJobFunctionProtocol

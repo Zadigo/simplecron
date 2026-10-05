@@ -13,10 +13,10 @@ async def monitor_page(job: Job, context: Context | None = None, **kwargs):
     async with page_lock:
         if context is not None:
             page: Page = context.json_data.get("page")
-            print(context)
+            
             if page is not None:
-                print(page)
-                await page.reload()
+                await page.query_selector("h1")
+            
             logger.info("Page monitored...")
 
 
