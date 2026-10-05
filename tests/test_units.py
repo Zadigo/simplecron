@@ -70,13 +70,13 @@ class TestDaily:
     def setup(self):
         self.scheduler = BaseScheduler()
 
-    def test_day(self):
+    def test_day(self, current_time):
         j = self.scheduler.create_every(1).day.do(callback)
 
         assert j.unit == TimeUnit.DAYS.value
         assert j._get_label() == "every 1 day"
 
-        next_run = datetime.datetime.now() + datetime.timedelta(days=1)
+        next_run = current_time + datetime.timedelta(days=1)
         assert j.next_run.date() == next_run.date()
 
     def test_days(self):
@@ -96,13 +96,13 @@ class TestWeekly:
     def setup(self):
         self.scheduler = BaseScheduler()
 
-    def test_week(self):
+    def test_week(self, current_time):
         j = self.scheduler.create_every(1).week.do(callback)
 
         assert j.unit == TimeUnit.WEEKS.value
         assert j._get_label() == "every 1 week"
 
-        next_run = datetime.datetime.now() + datetime.timedelta(weeks=1)
+        next_run = current_time + datetime.timedelta(weeks=1)
         assert j.next_run.date() == next_run.date()
 
     def test_weeks(self):
@@ -111,7 +111,7 @@ class TestWeekly:
         assert j.unit == TimeUnit.WEEKS.value
         assert j._get_label() == "every 15 weeks"
 
-    def test_other(self):
+    def test_other(self, current_time):
         """These specific categories of weekly job that
         are run a specific day of the week, like every Monday"""
         monday = self.scheduler.create_every(1).monday.do(callback)
@@ -122,29 +122,28 @@ class TestWeekly:
         saturday = self.scheduler.create_every(1).saturday.do(callback)
         sunday = self.scheduler.create_every(1).sunday.do(callback)
 
-        current_date = datetime.datetime.now()
-        days = 7 - current_date.weekday()
-        next_monday = current_date + datetime.timedelta(days=days)
+        days = 7 - current_time.weekday()
+        next_monday = current_time + datetime.timedelta(days=days)
         assert monday.next_run.date() == next_monday.date()
 
         def calc_days(value: int):
-            return (value - current_date.weekday() + 7) % 7
+            return (value - current_time.weekday() + 7) % 7
 
-        next_tuesday = current_date + datetime.timedelta(days=calc_days(1))
+        next_tuesday = current_time + datetime.timedelta(days=calc_days(1))
         assert tuesday.next_run.date() == next_tuesday.date()
 
-        next_wednesday = current_date + datetime.timedelta(days=calc_days(2))
+        next_wednesday = current_time + datetime.timedelta(days=calc_days(2))
         assert wednesday.next_run.date() == next_wednesday.date()
 
-        next_thursday = current_date + datetime.timedelta(days=calc_days(3))
+        next_thursday = current_time + datetime.timedelta(days=calc_days(3))
         assert thursday.next_run.date() == next_thursday.date()
 
-        next_friday = current_date + datetime.timedelta(days=calc_days(4))
+        next_friday = current_time + datetime.timedelta(days=calc_days(4))
         assert friday.next_run.date() == next_friday.date()
 
         # If the weekday is the current day, the job starts immediately (we tested this on a saturday)
-        # next_saturday = current_date + datetime.timedelta(days=calc_days(5))
-        # assert saturday.next_run.date() == next_saturday.date()
+        next_saturday = current_time + datetime.timedelta(days=calc_days(5))
+        assert saturday.next_run.date() == next_saturday.date()
 
-        next_sunday = current_date + datetime.timedelta(days=calc_days(6))
+        next_sunday = current_time + datetime.timedelta(days=calc_days(6))
         assert sunday.next_run.date() == next_sunday.date()
