@@ -152,6 +152,33 @@ default_scheduler.after_events(lambda job: print("After job:", job))
 
 ## Jobs
 
+## Async Jobs
+
+`Simplecron` supports asynchronous job execution, allowing you to run jobs concurrently without blocking the main thread.
+
+You just need to define your job functions as asynchronous functions using the `async def` syntax.
+
+```Python
+import asyncio
+
+from simplecron import base
+
+
+async def executor(*args, **kwargs):
+    print("Executed!")
+
+
+async def main():
+    base.every(5).seconds.do(executor)
+    while True:
+        base.run_pending()
+        await asyncio.sleep(1)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
 ### Cancelling
 
 To cancel a job, it simply needs to return an instance of `Cancel`.
@@ -160,6 +187,15 @@ To cancel a job, it simply needs to return an instance of `Cancel`.
 def callback(job: Job, *args, **kwargs):
 	print("Hello, World!", job)
 	return Cancel(job, reason="Some reason")  # This will cancel the job after it runs once
+```
+
+### Limiting runs
+
+You can limit the number of times a job runs by using the `with_limited_runs` method. This is useful when you want a job to execute only a specific number of times before being automatically cancelled.
+
+```Python
+job = base.every(10).seconds.do(executor)
+job.with_limited_runs(5)
 ```
 
 ### Types of jobs

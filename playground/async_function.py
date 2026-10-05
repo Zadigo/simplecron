@@ -3,12 +3,12 @@ import asyncio
 from simplecron import base
 
 
-async def some_function(*args, **kwargs):
+async def executor(*args, **kwargs):
     print("Executed!")
 
 
 async def main():
-    base.every(5).seconds.do(some_function)
+    base.every(5).seconds.do(executor)
     while True:
         base.run_pending()
         await asyncio.sleep(1)

@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import datetime
 import functools
 import inspect
@@ -142,6 +143,16 @@ class BaseScheduler:
 
     def __repr__(self):
         return f"<BaseScheduler(jobs={len(self._jobs)})>"
+
+    async def _shutdown(self):
+        """Shut down all background tasks."""
+        tasks = list(_background_tasks)
+        for t in tasks:
+            t.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    def _stop(self) -> None:
+        self._stop_event.set()
 
     def _resolve_listeners(self, jobs: Sequence[Job], *listeners: Listener):
         for listener in listeners:
@@ -375,8 +386,11 @@ class Job:
         self.is_cancelled = False
         # Indicates whether the job has been executed. If True, the job has already run at least once.
         self.was_executed = False
+        # The maximum number of times the job is allowed to run. If None, there is no limit.
+        self.max_runs: int | None = None
+
         # Indicates whether the job function is asynchronous
-        self.async_job = False
+        self.is_async_job = False
 
     def __repr__(self):
         return f"<Job([{self._get_label(as_slug=True)}], next_run={self.next_run})>"
@@ -753,6 +767,13 @@ class Job:
             ),
         )
 
+        if self.max_runs is not None:
+            self.max_runs -= 1
+            if self.max_runs <= 0:
+                self.scheduler._cancel_job(
+                    self, Cancel(self, reason="Reached maximum allowed runs")
+                )
+
     def destructure(self, str_json: bool = False) -> dict[str, str] | str:
         """Destructure the job instance into a
         dictionary representation that can be easily serialized."""
@@ -837,7 +858,7 @@ class Job:
         """
         inspect.signature(job_func).bind(self, context=None)
         self._job_func = job_func
-        self.async_job = inspect.iscoroutinefunction(job_func)
+        self.is_async_job = inspect.iscoroutinefunction(job_func)
 
         self._job_func = functools.partial(job_func, *args, **kwargs)
         functools.update_wrapper(self._job_func, job_func)
@@ -987,7 +1008,7 @@ class Job:
             )
 
         loop: asyncio.AbstractEventLoop | None = None
-        if self.async_job:
+        if self.is_async_job:
             try:
                 loop = asyncio.get_running_loop()
             except RuntimeError:
@@ -1050,6 +1071,17 @@ class Job:
         # )
         # return result
 
+    def with_limited_runs(self, max_runs: int):
+        """Limit the number of times this job can run.
+
+        Args:
+            max_runs (int): The maximum number of times the job is allowed to run.
+
+        Returns:
+            Job: The current job instance with the run limit applied.
+        """
+        self.max_runs = max_runs
+
 
 def every(interval: int, tag: str | None = None) -> Job:
     """Creates a new job instance using the default scheduler. This function
@@ -1076,3 +1108,29 @@ def start_blocking(**kwargs: Any):
     while True:
         default_scheduler.run_pending(**kwargs)
         time.sleep(1)
+
+
+async def async_start_blocking(context: dict | None = None) -> None:
+    """Run the scheduler cooperatively on the current event loop."""
+    _stop_event = asyncio.Event()
+
+    if context is not None:
+        context["stop_event"] = _stop_event
+
+    try:
+        while not _stop_event.is_set():
+            default_scheduler.run_pending(context=context)
+            with contextlib.suppress(TimeoutError):
+                # Waits for the stop event to be called within the 
+                # specified timeout (1 second). If not, it will raise a TimeoutError 
+                # which is suppressed and runs the loop again.
+                await asyncio.wait_for(_stop_event.wait(), timeout=1.0)
+
+            # try:
+            #     # Yields to the loop (so job tasks actually run)
+            #     # and lets stop() wake us up immediately
+            #     await asyncio.wait_for(_stop_event.wait(), timeout=1.0)
+            # except TimeoutError:
+            #     pass
+    finally:
+        await default_scheduler._shutdown()
