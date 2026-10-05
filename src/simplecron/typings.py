@@ -11,7 +11,7 @@ type TypeJob = "Job"
 
 type TypeBaseScheduler = "BaseScheduler"
 
-type TypeEventListenerCallback = Callable[[Sequence["Job"]], None]
+type TypeEventListenerCallback = Callable[[Job | Sequence["Job"]], None]
 
 type TypeDatetimes = datetime.datetime | datetime.time | datetime.timedelta
 

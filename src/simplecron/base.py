@@ -270,7 +270,7 @@ class BaseScheduler:
 
         Args:
             event (utils.EventListenerEnum): The event listener type to attach the callback to.
-            callback (Callable[[Sequence["Job"]], None]): The callback function to be executed when the event is triggered. It receives a sequence of jobs as its argument.
+            callback (TypeEventListenerCallback): The callback function to be executed when the event is triggered. It receives a single job or a sequence of jobs as its argument.
         """
         if event.value not in utils.EVENT_LISTENERS:
             raise ValueError(
