@@ -74,17 +74,17 @@ async def save_response(cancel: asyncio.Event):
 async def fetch_data(job: base.Job, **kwargs):
     async with asyncio.TaskGroup() as tg:
         for _ in range(10):
-            job.get_base_context.decrement_value("current_page")
-
-            page = job.get_base_context.get_value("current_page")
-            if page == 0:
+            # new_value = job.get_base_context.decrement_value("current_page")
+            new_value = job.get_base_context.decrement_value("current_page")
+            print(new_value)
+            if new_value == 0:
                 stop_event: asyncio.Event = job.get_base_context.get_value("stop_event")
                 if stop_event is not None:
                     for task in _active_tasks.values():
                         task.cancel("Global loop reached")
                     stop_event.clear()
 
-            task = tg.create_task(request(page), name="Request")
+            task = tg.create_task(request(new_value), name="Request")
 
             _request_tasks.add(task)
 
@@ -93,7 +93,7 @@ async def fetch_data(job: base.Job, **kwargs):
 
 
 async def scheduler_loop(total_pages: int):
-    base.every(60).seconds.do(fetch_data)
+    job = base.every(30).seconds.with_limited_runs(2).do(fetch_data)
 
     await base.async_start_blocking(
         context={"current_page": total_pages, "total_pages": total_pages}
