@@ -5,7 +5,6 @@ import functools
 import inspect
 import json
 import random
-from sys import exception
 import time
 import uuid
 from collections import defaultdict
@@ -95,7 +94,7 @@ class Listener:
         self.event = event
         self.callback = callback
         self.counter: int = 0
-        self.for_tags = for_tags
+        self.for_tags = for_tags or set()
 
     def __repr__(self):
         return f"<Listener(event={self.event}, counter={self.counter})>"
@@ -112,7 +111,7 @@ class Listener:
             else:
                 for job in jobs:
                     has_tags = job.has_tags(*list(self.for_tags))
-                    if self.for_tags is not None and not has_tags:
+                    if self.for_tags and not has_tags:
                         continue
                     self.callback(job)
         except Exception as e:
@@ -140,10 +139,10 @@ class BaseScheduler:
 
         self._jobs: list[Job] = []
         self.event_listeners = defaultdict(list[Listener])
-        self.context: Context | None = None
         self.providers = Provider(self)
         self.scheduler_uuid = uuid.uuid4()
 
+        # A context object attached to the scheduler
         self.base_context = Context(scheduler_uuid=str(self.scheduler_uuid))
 
         logger.info(f"Scheduler UUID is: {self.scheduler_uuid}")
@@ -207,7 +206,7 @@ class BaseScheduler:
 
         _jobs = sorted(filter(lambda job: job.should_run, self._jobs))
 
-        # Resolve listerners before all jobs are run
+        # Resolve BEFORE_ALL listerners before all jobs are run
         listeners = self.event_listeners[utils.EventListenerEnum.BEFORE_ALL.value]
         self._resolve_listeners(_jobs, *listeners)
 
@@ -318,7 +317,7 @@ class BaseScheduler:
             self.with_event_listener(utils.EventListenerEnum.AFTER, callback, for_tags)
 
     def with_context(self, context: Context):
-        """Replace the existing context of the scheduler with a new one.
+        """Merge the incoming context with the existing one if present.
 
         Args:
             context (Context): The context object to be attached to the scheduler.
@@ -326,7 +325,7 @@ class BaseScheduler:
         if context.scheduler_uuid is None:
             context.scheduler_uuid = str(self.scheduler_uuid)
 
-        if context.json_data is not None:
+        if context.json_data:
             self.base_context.json_data.update(context.json_data)
 
 
@@ -427,6 +426,12 @@ class Job:
     def __hash__(self):
         tags = tuple(sorted(self._tags))
         return hash((self.job_uuid, self._get_label(as_slug=True), *tags))
+
+    @property
+    def get_base_context(self) -> Context:
+        if self.scheduler is None:
+            raise ValueError("Scheduler is not set for this job.")
+        return self.scheduler.base_context
 
     @property
     def get_current_time(self) -> datetime.datetime:
@@ -879,7 +884,7 @@ class Job:
         Raises:
             SchedulerNotFoundError: If the job is created without an associated scheduler.
         """
-        inspect.signature(job_func).bind(self, context=None)
+        inspect.signature(job_func).bind(self)
         self._job_func = job_func
         self.is_async_job = inspect.iscoroutinefunction(job_func)
 
@@ -1053,7 +1058,7 @@ class Job:
                     return Skipped(self)
 
                 task = loop.create_task(
-                    self._job_func(self, context=self.scheduler.base_context),
+                    self._job_func(self),
                     name=f"simplecron-{self.job_uuid}",
                 )
                 _background_tasks.add(task)
@@ -1061,7 +1066,7 @@ class Job:
                 result = task
             else:
                 # Handles synchronous job execution
-                result = self._job_func(self, context=self.scheduler.base_context)
+                result = self._job_func(self)
                 self._after_execution()
         finally:
             # Advance the schedule even if a sync job raised,
@@ -1084,6 +1089,11 @@ class Job:
             Job: The current job instance with the run limit applied.
         """
         self.max_runs = max_runs
+
+
+def once(callback: TypeJobFunction):
+    job = default_scheduler.create_every(1).do(callback)
+    job.with_limited_runs(1)
 
 
 def every(interval: int, tag: str | None = None) -> Job:
@@ -1128,12 +1138,5 @@ async def async_start_blocking(context: dict | None = None) -> None:
                 # specified timeout (1 second). If not, it will raise a TimeoutError
                 # which is suppressed and runs the loop again.
                 await asyncio.wait_for(_stop_event.wait(), timeout=1.0)
-
-            # try:
-            #     # Yields to the loop (so job tasks actually run)
-            #     # and lets stop() wake us up immediately
-            #     await asyncio.wait_for(_stop_event.wait(), timeout=1.0)
-            # except TimeoutError:
-            #     pass
     finally:
         await default_scheduler._shutdown()

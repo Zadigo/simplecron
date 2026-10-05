@@ -118,7 +118,7 @@ class TestBaseScheduler:
     def test_cancel_job(self):
         s = BaseScheduler()
         s.create_every(1).minutes.do(cancelled_executor)
-        s._cancel_job(s._jobs[0])
+        s._cancel_job(s._jobs[0], Cancel(s._jobs[0], reason="Test cancel"))
 
         assert len(s._jobs) == 0
 
@@ -190,7 +190,7 @@ class TestBaseScheduler:
         # Run pending jobs
         s.run_pending()
 
-        for _, listeners in s.event_listeners.items():
+        for listeners in s.event_listeners.values():
             for listener in listeners:
                 assert listener.counter > 0
 
@@ -207,12 +207,11 @@ class TestBaseScheduler:
         # Correct calling order: every -> unit -> do
         s.create_every(1).minutes.do(executor)
 
-    def test_async_job_execution(self):
+    async def test_async_job_execution(self):
         s = BaseScheduler()
 
         # Create an async job
         s.create_every(1).seconds.do(async_executor)
-        time.sleep(1.5)  # Wait for the job to be debugged and executed
 
         # Run pending jobs
         s.run_pending()

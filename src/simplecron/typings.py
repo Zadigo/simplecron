@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
     from simplecron.base import BaseScheduler, Cancel, Job, Skipped
-    from simplecron.context import Context
 
 
 type TypeJob = "Job"
@@ -18,12 +17,12 @@ type TypeDatetimes = datetime.datetime | datetime.time | datetime.timedelta
 
 type TypeJobReturn = Cancel | Skipped | asyncio.Task[Any]
 
+
 class AsyncJobFunctionProtocol(Protocol):
     async def __call__(
         self,
         job: Job,
         *,
-        context: Context | None = None,
         stop_event: asyncio.Event | None = None,
         **kwargs: Any,
     ) -> Awaitable[TypeJobReturn]: ...
@@ -31,12 +30,11 @@ class AsyncJobFunctionProtocol(Protocol):
 
 type TypeAsyncJobFunction = AsyncJobFunctionProtocol
 
+
 class JobFunctionProtocol(Protocol):
     def __call__(
         self,
         job: Job,
-        *,
-        context: Context | None = None,
         **kwargs: Any,
     ) -> TypeJobReturn: ...
 
